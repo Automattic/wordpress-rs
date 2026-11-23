@@ -208,7 +208,10 @@ struct SafeRequestExecutorTests {
         arguments: [
             ("https://{cdn}/wp-json/", "https://%7Bcdn%7D/wp-json/"),
             ("https://example.com/wp-json/a|b?q[0]=^", "https://example.com/wp-json/a%7Cb?q%5B0%5D=%5E"),
-            ("https://example.com/wp-json/", "https://example.com/wp-json/")
+            // `URL(string:)` alone would send `a%2520b%7Cc` on iOS 17 and macOS 14 and later.
+            ("https://example.com/wp-json/a%20b|c", "https://example.com/wp-json/a%20b%7Cc"),
+            ("https://example.com/wp-json/", "https://example.com/wp-json/"),
+            ("https://example.com/wp-json/?search=a%20b", "https://example.com/wp-json/?search=a%20b")
         ]
     )
     func testBuildURLRequestEncodesCharactersURLRejects(url: String, expected: String) throws {
