@@ -94,5 +94,6 @@ Write tests are marked with the "ignored" flag and include:
 - `support_bots::create_and_add_message` - Creates a conversation and adds a message
 - `support_tickets::create_ticket` - Creates a new support ticket
 - `support_tickets::create_and_add_message` - Creates a ticket and adds a message
+- `notification_writes::*` - Mark the account's notes read, unread and seen. One moves the last seen time forward, which can't be undone. Read each trial's doc comment in `src/notification_write_tests.rs` and run it alone with `--ignored --exact <name>`.
 
 These tests create real data in the WordPress.com system and should be run sparingly.

@@ -165,6 +165,8 @@ pub enum DbTable {
     NotificationSyncState,
     /// Where each tab of each account's notifications is up to
     NotificationTabState,
+    /// Notes marked read or unread that the server doesn't have yet
+    NotificationReadChanges,
 }
 
 impl DbTable {
@@ -212,6 +214,7 @@ impl DbTable {
             DbTable::NotificationListedOnly => "notification_listed_only",
             DbTable::NotificationSyncState => "notification_sync_state",
             DbTable::NotificationTabState => "notification_tab_state",
+            DbTable::NotificationReadChanges => "notification_read_changes",
         }
     }
 }
@@ -272,6 +275,7 @@ impl TryFrom<&str> for DbTable {
             "notification_listed_only" => Ok(DbTable::NotificationListedOnly),
             "notification_sync_state" => Ok(DbTable::NotificationSyncState),
             "notification_tab_state" => Ok(DbTable::NotificationTabState),
+            "notification_read_changes" => Ok(DbTable::NotificationReadChanges),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }

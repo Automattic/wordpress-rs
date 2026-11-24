@@ -1102,7 +1102,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
 /// The account whose token the trials use. Each trial's cache is new, so any user ID keeps them
 /// apart.
-fn account() -> ReaderOwner {
+pub(crate) fn account() -> ReaderOwner {
     ReaderOwner::Account {
         user_id: WpComUserId(1),
     }
@@ -1185,7 +1185,7 @@ async fn views_of(ctx: &TestContext, site_id: WpComSiteId, post_id: PostId) -> R
 }
 
 /// The newest post of a site, as the cache has it after a refresh of the site's stream.
-async fn first_post_of(
+pub(crate) async fn first_post_of(
     service: &ReaderService,
     site_id: WpComSiteId,
 ) -> Result<ReaderPostRecord, Failed> {
@@ -1213,7 +1213,7 @@ fn own_site_client(ctx: &TestContext, site_id: WpComSiteId) -> WpApiClient {
 
 /// Whether the server has the account's like on a post, asked of the post's likes directly:
 /// nothing of the service or its cache is in the answer.
-async fn server_says_post_liked(
+pub(crate) async fn server_says_post_liked(
     ctx: &TestContext,
     post: &ReaderPostRecord,
 ) -> Result<bool, Failed> {
@@ -1236,7 +1236,7 @@ async fn server_says_post_liked(
 
 /// Likes or unlikes a post through the service, and checks that the server has it and the cache
 /// shows it.
-async fn like_and_check(
+pub(crate) async fn like_and_check(
     ctx: &TestContext,
     service: &ReaderService,
     post: &ReaderPostRecord,
@@ -2016,7 +2016,10 @@ async fn download_saved_posts(
 }
 
 /// A service with a new, empty cache.
-fn new_service(delegate: WpApiClientDelegate, owner: ReaderOwner) -> Result<ReaderService, Failed> {
+pub(crate) fn new_service(
+    delegate: WpApiClientDelegate,
+    owner: ReaderOwner,
+) -> Result<ReaderService, Failed> {
     let cache = WpApiCache::new(None).map_err(|e| e.to_string())?;
     cache.perform_migrations().map_err(|e| e.to_string())?;
     Ok(

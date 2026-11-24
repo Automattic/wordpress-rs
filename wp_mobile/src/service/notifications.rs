@@ -24,6 +24,8 @@
 //! - A tab's list of IDs and hashes has the same hashes as the list of every note, so a note
 //!   another tab downloaded isn't downloaded again. A note missing from the Unread tab's list
 //!   may only have been read, so that list never removes a note.
+//!
+//! Marking notes read, unread and seen is in the `changes` module.
 
 use futures::lock::Mutex as AsyncMutex;
 use std::collections::{HashMap, HashSet};
@@ -55,11 +57,12 @@ const MAX_PAGE_SIZE: u32 = 200;
 const DOWNLOAD_AT_A_TIME: usize = 100;
 
 /// The tables the cached notes and their state are read from.
-const NOTIFICATION_TABLES: [DbTable; 4] = [
+const NOTIFICATION_TABLES: [DbTable; 5] = [
     DbTable::Notifications,
     DbTable::NotificationListedOnly,
     DbTable::NotificationSyncState,
     DbTable::NotificationTabState,
+    DbTable::NotificationReadChanges,
 ];
 
 #[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
@@ -75,6 +78,12 @@ pub enum NotificationServiceError {
     /// more notes in a row can't be sent whole, than the largest page holds. Nothing changed.
     #[error("Older notifications can't be loaded past this point without skipping some.")]
     CannotPageFurther,
+
+    /// The server answered a change to notes' read or seen state without making it: its answer
+    /// said it failed, or showed the note in the other state. The cache shows what the server
+    /// has.
+    #[error("The server answered without making the change.")]
+    ChangeNotMade,
 }
 
 impl From<WpApiError> for NotificationServiceError {
@@ -143,15 +152,16 @@ pub struct NotificationsInfo {
     /// When the newest notes of the All tab were last synced. `None` before the first sync.
     #[uniffi(default = None)]
     pub last_synced_at: Option<WpGmtDateTime>,
-    /// When the user last looked at their notifications, as the API last said.
+    /// The time of the newest note the user has seen: the API's, or a newer one
+    /// [`NotificationService::mark_seen`] recorded that isn't sent yet.
     #[uniffi(default = None)]
     pub last_seen_time: Option<WpGmtDateTime>,
 }
 
 pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 
-/// A WordPress.com account's notifications: read from the cache, and kept up to date from the
-/// server. Every request it sends is a GET: nothing here marks a note read or seen.
+/// A WordPress.com account's notifications: read from the cache, kept up to date from the server,
+/// and marked read, unread and seen.
 ///
 /// Create one per account and share it. Read the cached notes with [`Self::load_notes`] or
 /// [`Self::load_tab_notes`], which don't touch the network, and read them again when
@@ -164,6 +174,10 @@ pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 /// [`Self::refresh_note`] or [`Self::remove_note`]. With no such channel, calling [`Self::sync`]
 /// on a timer costs one small request when nothing changed.
 ///
+/// [`Self::mark_read`], [`Self::mark_unread`], [`Self::mark_all_read`] and [`Self::mark_seen`]
+/// change the cache at once, then send the change. One that can't be sent yet is kept, and sent by
+/// [`Self::send_pending_changes`] or the next change. Syncs send only GET requests.
+///
 /// Which notes the API sends can depend on the request's `User-Agent`, which the delegate's
 /// request executor sets, not this service.
 ///
@@ -171,13 +185,19 @@ pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 #[derive(uniffi::Object)]
 pub struct NotificationService {
     client: WpComApiClient,
+    /// The client changes are sent with. It sends the service's language in the address, as
+    /// every other request does in its query.
+    write_client: WpComApiClient,
     cache: Arc<WpApiCache>,
     user_id: WpComUserId,
     /// The account's row in the cache.
     account: RowId,
-    language: Mutex<Option<WPComLanguage>>,
-    /// Held while a sync or a page of older notes runs, so they take turns.
+    language: Arc<Mutex<Option<WPComLanguage>>>,
+    /// Held while a sync, a page of older notes or the sending of changes runs, so they take
+    /// turns, and a sync never sees the server halfway through a change.
     lane: AsyncMutex<()>,
+    /// The changes calls wait on, and the server's answer to each once it comes.
+    answers: changes::Answers,
     clock: Clock,
     /// How many of the newest notes a sync checks, and how many notes an older page has.
     page_size: u32,
@@ -407,7 +427,11 @@ impl NotificationService {
             .into_iter()
             .filter_map(
                 |row| match serde_json::from_str::<WpComNotification>(&row.json) {
-                    Ok(note) => Some(note),
+                    // A note shows as the user last marked it, sent or not.
+                    Ok(note) => Some(WpComNotification {
+                        read: row.read,
+                        ..note
+                    }),
                     // Every stored note was read before it was stored, so only a change in how
                     // notes are read can make one unreadable.
                     Err(error) => {
@@ -436,7 +460,7 @@ impl NotificationService {
                 unreadable_count,
                 reached_end: all.reached_end,
                 last_synced_at: state.last_synced_at.and_then(date),
-                last_seen_time: state.last_seen_time.and_then(date),
+                last_seen_time: state.seen_time().and_then(date),
             })
         })?)
     }
@@ -457,17 +481,23 @@ impl NotificationService {
         let account = cache.execute(|connection| {
             WordPressComAccountRepository::get_or_create(connection, user_id)
         })?;
+        let language = Arc::new(Mutex::default());
         Ok(Self {
             // The service sends its own language: see `set_language`.
             client: WpComApiClient::new(WpApiClientDelegate {
                 language_provider: None,
+                ..delegate.clone()
+            }),
+            write_client: WpComApiClient::new(WpApiClientDelegate {
+                language_provider: Some(Arc::new(changes::ServiceLanguage(language.clone()))),
                 ..delegate
             }),
             cache,
             user_id,
             account,
-            language: Mutex::default(),
+            language,
             lane: AsyncMutex::new(()),
+            answers: changes::Answers::default(),
             clock,
             page_size: PAGE_SIZE,
         })
@@ -486,7 +516,7 @@ impl NotificationService {
 
     /// The language every request is sent in.
     fn locale(&self) -> WPComLanguage {
-        self.language().unwrap_or(WPComLanguage::English)
+        changes::locale(&self.language)
     }
 
     fn states(
@@ -830,6 +860,9 @@ fn oldest(times: &[Option<i64>]) -> Option<i64> {
 fn date(seconds: i64) -> Option<WpGmtDateTime> {
     chrono::DateTime::from_timestamp(seconds, 0).map(WpGmtDateTime)
 }
+
+mod changes;
+pub use changes::NotificationChangeOutcome;
 
 #[cfg(test)]
 mod tests;

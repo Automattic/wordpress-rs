@@ -7,8 +7,10 @@ import uniffi.wp_api.NotificationTab
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpNetworkHeaderMap
+import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.localizedDescription
+import uniffi.wp_mobile.NotificationChangeOutcome
 import uniffi.wp_mobile.NotificationsFilter
 import java.util.Locale
 import kotlin.test.assertEquals
@@ -44,6 +46,43 @@ class NotificationServiceTest {
     )
 
     private val client = WpComApiClient(WpAuthenticationProvider.none(), executor)
+
+    private fun isPost(request: WpNetworkRequest, path: String) =
+        request.method() == RequestMethod.POST && request.url().contains("/rest/v1.1$path?")
+
+    /** Takes every write and answers the bell's flag, so nothing reaches a server. */
+    private val writes = MockRequestExecutor(
+        listOf(
+            Stub({ isPost(it, "/notifications/read/all") }, json("""{"success":true,"count":1}""")),
+            Stub({ isPost(it, "/notifications/read") }, json("""{"success":true}""")),
+            Stub({ isPost(it, "/notifications/seen") }, json("""{"success":true}""")),
+            Stub({ it.url().contains("/rest/v1.1/me?fields=has_unseen_notes") }, json("""{"has_unseen_notes":false}""")),
+            Stub({ it.url().contains("fields=id%2Cnote_hash") }, hashes),
+            Stub({ it.url().contains("ids=") }, whole),
+        )
+    )
+
+    @Test
+    fun notesAreMarkedReadUnreadAndSeen() = runTest {
+        val cache = WordPressApiCache()
+        cache.performMigrations()
+        val service = WpComApiClient(WpAuthenticationProvider.none(), writes).makeNotificationService(cache, 1uL)
+        service.sync()
+
+        assertEquals(NotificationChangeOutcome.SENT, service.markRead(listOf(10_000_000_002uL)))
+        assertTrue(service.loadTabNotes(NotificationTab.UNREAD).isEmpty())
+        assertEquals(NotificationChangeOutcome.SENT, service.markUnread(listOf(10_000_000_001uL)))
+        assertEquals(listOf(10_000_000_001uL), service.loadTabNotes(NotificationTab.UNREAD).map { it.id })
+        assertEquals(NotificationChangeOutcome.SENT, service.markAllRead(NotificationTab.ALL, null))
+        assertTrue(service.loadTabNotes(NotificationTab.UNREAD).isEmpty())
+
+        assertTrue(service.hasUnseenNotes())
+        assertEquals(NotificationChangeOutcome.SENT, service.markSeen(null))
+        assertFalse(service.hasUnseenNotes())
+        assertFalse(service.fetchHasUnseenNotes())
+        assertEquals(0uL, service.sendPendingChanges())
+        assertEquals(0uL, service.pendingChangeCount())
+    }
 
     @Test
     fun aSyncStoresTheNewestNotesAndANewHashDownloadsAgain() = runTest {

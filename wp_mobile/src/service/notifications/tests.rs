@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use wp_api::prelude::RequestMethod;
 use wp_api::wp_com::language::WpComLanguageProvider;
 use wp_api::wp_com::notifications::NotificationType;
+use wp_mobile_cache::repository::notifications::NotificationRepository;
 
 const USER: WpComUserId = WpComUserId(1);
 
@@ -1327,4 +1328,582 @@ async fn a_check_with_nothing_changed_is_one_small_request() {
     let query = &params(&executor)[before];
     assert_eq!(query["fields"], "id,note_hash");
     assert!(!query.contains_key("ids"));
+}
+
+// Marking notes read, unread and seen
+
+/// Three unread notes, 3 newest, synced through the All tab. Notes 1 and 3 are likes.
+async fn three_unread(service: &NotificationService, executor: &ScriptedExecutor) {
+    sync_with(
+        service,
+        executor,
+        checked(&[(3, 31), (2, 21), (1, 11)]),
+        Some(whole_typed(&[
+            (3, T + 3, 32, "like", false),
+            (2, T + 2, 22, "comment", false),
+            (1, T + 1, 12, "like", false),
+        ])),
+    )
+    .await;
+}
+
+/// Each POST request's path and query, after `rest/v1.1`, and its body.
+fn posts(executor: &ScriptedExecutor) -> Vec<(String, Value)> {
+    executor
+        .sent()
+        .iter()
+        .filter(|sent| sent.method == RequestMethod::POST)
+        .map(|sent| {
+            let url = url::Url::parse(&sent.url).unwrap();
+            let path = url.path().trim_start_matches("/rest/v1.1").to_string();
+            let path = match url.query() {
+                Some(query) => format!("{path}?{query}"),
+                None => path,
+            };
+            (path, sent.body.clone().unwrap_or(Value::Null))
+        })
+        .collect()
+}
+
+fn counts(pairs: &[(u64, i64)]) -> Value {
+    let counts: serde_json::Map<String, Value> = pairs
+        .iter()
+        .map(|(n, count)| (id(*n).to_string(), json!(count)))
+        .collect();
+    json!({ "counts": counts, "source": "mobile" })
+}
+
+fn taken(unread_afterwards: &[u64]) -> Value {
+    let updated: Vec<u64> = unread_afterwards.iter().map(|n| id(*n)).collect();
+    json!({ "success": true, "updated": updated })
+}
+
+fn note_ids(ns: &[u64]) -> Vec<NotificationId> {
+    ns.iter().map(|n| NotificationId(id(*n))).collect()
+}
+
+/// Whether each cached note shows as read, newest first.
+fn read_states(service: &NotificationService) -> Vec<(u64, Option<bool>)> {
+    service
+        .load_notes(NotificationsFilter::default())
+        .unwrap()
+        .iter()
+        .map(|note| (note.id.0 - id(0), note.read))
+        .collect()
+}
+
+#[tokio::test]
+async fn marking_a_note_read_shows_at_once_and_sends_one_post() {
+    let cache = cache();
+    let (service, executor) = service_in(cache.clone(), USER, 3);
+    service.set_language(Some(WPComLanguage::German));
+    three_unread(&service, &executor).await;
+
+    executor.push(Step::Respond(200, taken(&[])));
+    let (outcome, hooks) = hooks_of(&cache, service.mark_read(note_ids(&[1]))).await;
+
+    assert_eq!(outcome.unwrap(), NotificationChangeOutcome::Sent);
+    // The write is sent in the service's language, as every request is, and names the client.
+    assert_eq!(
+        posts(&executor),
+        [(
+            "/notifications/read?locale=de".to_string(),
+            counts(&[(1, 9999)])
+        )]
+    );
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [3, 2]);
+    assert_eq!(
+        read_states(&service),
+        [(3, Some(false)), (2, Some(false)), (1, Some(true))]
+    );
+    assert_eq!(service.pending_change_count().unwrap(), 0);
+    assert!(hooks.iter().any(|hook| service.is_relevant_update(hook)));
+    assert!(
+        hooks
+            .iter()
+            .any(|hook| hook.table == DbTable::NotificationReadChanges)
+    );
+
+    // The server's state is stored in the note itself, so it outlasts the change.
+    let stored = service.cache.execute(|connection| {
+        NotificationRepository::read_states(&*connection, service.account, &note_ids(&[1]))
+    });
+    assert_eq!(stored.unwrap()[&NotificationId(id(1))], Some(true));
+}
+
+#[tokio::test]
+async fn marking_a_note_unread_brings_it_back_to_the_unread_tab() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Respond(200, taken(&[])));
+    service.mark_read(note_ids(&[2, 3])).await.unwrap();
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [1]);
+
+    executor.push(Step::Respond(200, taken(&[2])));
+    let outcome = service.mark_unread(note_ids(&[2])).await.unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Sent);
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [2, 1]);
+    let posts = posts(&executor);
+    assert_eq!(posts[0].1, counts(&[(2, 9999), (3, 9999)]));
+    assert_eq!(posts[1].1, counts(&[(2, -1)]));
+}
+
+#[tokio::test]
+async fn a_note_that_already_shows_that_way_sends_nothing() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    let before = executor.sent().len();
+    let outcome = service.mark_unread(note_ids(&[1, 2])).await.unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Unchanged);
+    assert_eq!(
+        service.mark_read(Vec::new()).await.unwrap(),
+        NotificationChangeOutcome::Unchanged
+    );
+    assert_eq!(executor.sent().len(), before);
+}
+
+#[tokio::test]
+async fn a_note_the_cache_does_not_have_is_still_sent() {
+    let (service, executor) = service();
+    executor.push(Step::Respond(200, taken(&[])));
+    let outcome = service.mark_read(note_ids(&[7])).await.unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Sent);
+    assert_eq!(posts(&executor)[0].1, counts(&[(7, 9999)]));
+}
+
+/// Offline, the change shows and waits; the next `send_pending_changes` sends it.
+#[tokio::test]
+async fn a_change_made_offline_shows_and_is_sent_later() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+
+    executor.push(Step::Offline);
+    let outcome = service.mark_read(note_ids(&[3])).await.unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Waiting);
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [2, 1]);
+    assert_eq!(service.pending_change_count().unwrap(), 1);
+
+    // Still offline: it stays, and nothing else is tried after the first request fails.
+    executor.push(Step::TimedOut);
+    assert_eq!(service.send_pending_changes().await.unwrap(), 1);
+
+    executor.push(Step::Respond(200, taken(&[])));
+    assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [2, 1]);
+    assert_eq!(posts(&executor).len(), 3);
+    assert!(
+        posts(&executor)
+            .iter()
+            .all(|(_, body)| *body == counts(&[(3, 9999)]))
+    );
+}
+
+/// A rejected sign-in is no answer: the change waits for the user to sign in again.
+#[tokio::test]
+async fn a_change_the_server_rejects_the_sign_in_for_waits() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Respond(
+        401,
+        json!({ "error": "invalid_token", "message": "An invented message." }),
+    ));
+    let outcome = service.mark_read(note_ids(&[3])).await.unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Waiting);
+    assert_eq!(service.pending_change_count().unwrap(), 1);
+}
+
+/// Refused for good: the change goes, the note shows as the server has it, and the call fails.
+#[tokio::test]
+async fn a_change_the_server_refuses_goes_back() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+
+    executor.push(Step::Respond(
+        403,
+        json!({ "error": "unauthorized", "message": "An invented message." }),
+    ));
+    let error = service.mark_read(note_ids(&[3])).await.unwrap_err();
+    assert!(
+        matches!(error, NotificationServiceError::Api(_)),
+        "{error:?}"
+    );
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [3, 2, 1]);
+    assert_eq!(service.pending_change_count().unwrap(), 0);
+
+    // A success that says it failed is a refusal too.
+    executor.push(Step::Respond(200, json!({ "success": false })));
+    let error = service.mark_read(note_ids(&[3])).await.unwrap_err();
+    assert!(
+        matches!(error, NotificationServiceError::ChangeNotMade),
+        "{error:?}"
+    );
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [3, 2, 1]);
+    assert_eq!(service.pending_change_count().unwrap(), 0);
+}
+
+/// The answer lists the notes unread afterwards. A note marked unread that isn't in it stayed
+/// read, as the web panel reads the answer.
+#[tokio::test]
+async fn the_answer_decides_what_the_server_has() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Respond(200, taken(&[])));
+    service.mark_read(note_ids(&[3])).await.unwrap();
+
+    executor.push(Step::Respond(200, taken(&[])));
+    let error = service.mark_unread(note_ids(&[3])).await.unwrap_err();
+    assert!(
+        matches!(error, NotificationServiceError::ChangeNotMade),
+        "{error:?}"
+    );
+    assert_eq!(read_states(&service)[0], (3, Some(true)));
+}
+
+/// The server still has the note unread until the change lands, and a sync stores that. The note
+/// still shows as read.
+#[tokio::test]
+async fn a_sync_before_the_change_is_sent_does_not_undo_it() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+
+    executor.push(Step::Offline);
+    service.mark_read(note_ids(&[3])).await.unwrap();
+    // Another client fetched the note, so its hash changed, and it's downloaded unread.
+    sync_with(
+        &service,
+        &executor,
+        checked(&[(3, 33), (2, 22), (1, 12)]),
+        Some(whole_typed(&[(3, T + 3, 34, "like", false)])),
+    )
+    .await;
+    assert_eq!(read_states(&service)[0], (3, Some(true)));
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [2, 1]);
+    // The Unread tab's own sync lists the note, as the server has it unread, and keeps it read.
+    sync_tab_with(
+        &service,
+        &executor,
+        NotificationTab::Unread,
+        checked(&[(3, 34), (2, 22), (1, 12)]),
+        Vec::new(),
+    )
+    .await;
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [2, 1]);
+
+    executor.push(Step::Respond(200, taken(&[])));
+    assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+    assert_eq!(read_states(&service)[0], (3, Some(true)));
+}
+
+/// A sync that's running when the user marks a note holds the lane: the note shows as read at
+/// once, the sync stores the server's unread copy, and the change is sent after the sync.
+#[tokio::test]
+async fn a_change_made_during_a_sync_shows_at_once_and_is_sent_after_it() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+
+    let (release, held) = futures::channel::oneshot::channel();
+    executor.push(Step::Hold(held, 200, checked(&[(3, 33), (2, 22), (1, 12)])));
+    executor.push(Step::Respond(
+        200,
+        whole_typed(&[(3, T + 3, 34, "like", false)]),
+    ));
+    executor.push(Step::Respond(200, taken(&[])));
+    let (synced, marked, ()) =
+        tokio::join!(service.sync(), service.mark_read(note_ids(&[3])), async {
+            assert_eq!(tab_shown(&service, NotificationTab::Unread), [2, 1]);
+            release.send(()).unwrap();
+        });
+    synced.unwrap();
+    assert_eq!(marked.unwrap(), NotificationChangeOutcome::Sent);
+    // The sync's two requests went before the change.
+    let methods: Vec<RequestMethod> = executor
+        .sent()
+        .into_iter()
+        .map(|sent| sent.method)
+        .collect();
+    assert_eq!(
+        methods[methods.len() - 3..],
+        [RequestMethod::GET, RequestMethod::GET, RequestMethod::POST]
+    );
+    assert_eq!(read_states(&service)[0], (3, Some(true)));
+}
+
+/// A change to a note made while its first change is being sent is sent after it, and the note
+/// ends as the user last left it.
+#[tokio::test]
+async fn a_change_made_while_one_is_sent_is_sent_after_it() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+
+    let (release, held) = futures::channel::oneshot::channel();
+    executor.push(Step::Hold(held, 200, taken(&[])));
+    executor.push(Step::Respond(200, taken(&[3])));
+    let (read, unread, ()) = tokio::join!(
+        service.mark_read(note_ids(&[3])),
+        service.mark_unread(note_ids(&[3])),
+        async {
+            assert_eq!(tab_shown(&service, NotificationTab::Unread), [3, 2, 1]);
+            release.send(()).unwrap();
+        }
+    );
+    assert_eq!(read.unwrap(), NotificationChangeOutcome::Sent);
+    assert_eq!(unread.unwrap(), NotificationChangeOutcome::Sent);
+    let bodies: Vec<Value> = posts(&executor).into_iter().map(|(_, body)| body).collect();
+    assert_eq!(bodies, [counts(&[(3, 9999)]), counts(&[(3, -1)])]);
+    assert_eq!(read_states(&service)[0], (3, Some(false)));
+    assert_eq!(service.pending_change_count().unwrap(), 0);
+}
+
+/// The All tab marks every note read with one request, up to its newest cached note, and a note
+/// that arrives after stays unread.
+#[tokio::test]
+async fn marking_every_note_read_sends_the_newest_time() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+
+    executor.push(Step::Offline);
+    let outcome = service
+        .mark_all_read(NotificationTab::All, None)
+        .await
+        .unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Waiting);
+    assert!(tab_shown(&service, NotificationTab::Unread).is_empty());
+    assert_eq!(service.pending_change_count().unwrap(), 1);
+
+    // A newer note arrives before it's sent.
+    sync_with(
+        &service,
+        &executor,
+        checked(&[(4, 41), (3, 32), (2, 22)]),
+        Some(whole_typed(&[(4, T + 4, 42, "like", false)])),
+    )
+    .await;
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [4]);
+
+    executor.push(Step::Respond(
+        200,
+        json!({ "success": true, "count": 3, "last_seen_time": T.to_string() }),
+    ));
+    assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+    let posts = posts(&executor);
+    assert_eq!(posts[0].0, "/notifications/read/all?locale=en");
+    assert_eq!(posts[1].1, json!({ "time": T + 3, "source": "mobile" }));
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [4]);
+}
+
+#[tokio::test]
+async fn marking_every_note_read_up_to_a_time_leaves_newer_ones() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Respond(200, json!({ "success": true, "count": 2 })));
+    let outcome = service
+        .mark_all_read(NotificationTab::Unread, date(T + 2))
+        .await
+        .unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Sent);
+    assert_eq!(
+        posts(&executor)[0].1,
+        json!({ "time": T + 2, "source": "mobile" })
+    );
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [3]);
+}
+
+/// Another tab marks its own cached unread notes, by ID: marking every note read can't be
+/// narrowed to a type.
+#[tokio::test]
+async fn marking_a_tab_read_marks_its_cached_unread_notes() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Respond(200, taken(&[])));
+    let outcome = service
+        .mark_all_read(NotificationTab::Likes, None)
+        .await
+        .unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Sent);
+    let posts = posts(&executor);
+    assert_eq!(posts[0].0, "/notifications/read?locale=en");
+    assert_eq!(posts[0].1, counts(&[(3, 9999), (1, 9999)]));
+    assert_eq!(tab_shown(&service, NotificationTab::Unread), [2]);
+    assert_eq!(
+        service
+            .mark_all_read(NotificationTab::Likes, None)
+            .await
+            .unwrap(),
+        NotificationChangeOutcome::Unchanged
+    );
+}
+
+#[tokio::test]
+async fn nothing_cached_is_nothing_to_mark() {
+    let (service, executor) = service();
+    assert_eq!(
+        service
+            .mark_all_read(NotificationTab::All, None)
+            .await
+            .unwrap(),
+        NotificationChangeOutcome::Unchanged
+    );
+    assert_eq!(
+        service.mark_seen(None).await.unwrap(),
+        NotificationChangeOutcome::Unchanged
+    );
+    assert!(!service.has_unseen_notes().unwrap());
+    assert!(executor.sent().is_empty());
+}
+
+/// Marking seen clears the unseen flag at once, and the time only moves forward.
+#[tokio::test]
+async fn marking_seen_clears_the_flag_and_only_moves_forward() {
+    let (service, executor) = service();
+    // The notes are all newer than the time the user last looked, `T`.
+    three_unread(&service, &executor).await;
+    assert!(service.has_unseen_notes().unwrap());
+
+    executor.push(Step::Respond(
+        200,
+        json!({ "success": true, "last_seen_time": (T + 3).to_string() }),
+    ));
+    let outcome = service.mark_seen(None).await.unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Sent);
+    assert_eq!(
+        posts(&executor),
+        [(
+            "/notifications/seen?locale=en".to_string(),
+            json!({ "time": T + 3, "source": "mobile" })
+        )]
+    );
+    assert!(!service.has_unseen_notes().unwrap());
+    assert_eq!(service.info().unwrap().last_seen_time, date(T + 3));
+
+    // An older time, or the same one, sends nothing.
+    for time in [T + 2, T + 3] {
+        assert_eq!(
+            service.mark_seen(date(time)).await.unwrap(),
+            NotificationChangeOutcome::Unchanged
+        );
+    }
+    assert_eq!(posts(&executor).len(), 1);
+
+    // A sync that brings the server's older time doesn't move it back.
+    sync_with(
+        &service,
+        &executor,
+        checked(&[(3, 32), (2, 22), (1, 12)]),
+        None,
+    )
+    .await;
+    assert_eq!(service.info().unwrap().last_seen_time, date(T + 3));
+    assert!(!service.has_unseen_notes().unwrap());
+}
+
+/// Offline, the flag clears at once and the time waits. A sync that brings a newer time from
+/// another device makes it stale, and it's dropped without being sent.
+#[tokio::test]
+async fn a_seen_time_made_offline_clears_the_flag_and_is_never_sent_backwards() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Offline);
+    let outcome = service.mark_seen(date(T + 2)).await.unwrap();
+    assert_eq!(outcome, NotificationChangeOutcome::Waiting);
+    assert_eq!(service.pending_change_count().unwrap(), 1);
+    assert!(
+        service.has_unseen_notes().unwrap(),
+        "note 3 is newer than T + 2"
+    );
+
+    let mut check = checked(&[(3, 32), (2, 22), (1, 12)]);
+    check["last_seen_time"] = json!((T + 5).to_string());
+    sync_with(&service, &executor, check, None).await;
+    let posts_before = posts(&executor).len();
+    assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+    assert_eq!(posts(&executor).len(), posts_before);
+    assert!(!service.has_unseen_notes().unwrap());
+}
+
+#[tokio::test]
+async fn a_refused_seen_time_is_dropped() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Respond(200, json!({ "success": false })));
+    let error = service.mark_seen(None).await.unwrap_err();
+    assert!(
+        matches!(error, NotificationServiceError::ChangeNotMade),
+        "{error:?}"
+    );
+    assert_eq!(service.pending_change_count().unwrap(), 0);
+    assert!(service.has_unseen_notes().unwrap());
+}
+
+/// The server's flag is asked for with one small GET, unless a seen time still waits.
+#[tokio::test]
+async fn the_servers_unseen_flag() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Respond(200, json!({ "has_unseen_notes": true })));
+    assert!(service.fetch_has_unseen_notes().await.unwrap());
+    let last = executor.sent().last().cloned().unwrap();
+    assert_eq!(last.method, RequestMethod::GET);
+    assert!(
+        last.url.ends_with("/rest/v1.1/me?fields=has_unseen_notes"),
+        "{}",
+        last.url
+    );
+
+    executor.push(Step::Offline);
+    service.mark_seen(None).await.unwrap();
+    // The seen time is tried again first, and still can't be sent, so the server isn't asked.
+    executor.push(Step::Offline);
+    let before = executor.sent().len();
+    assert!(!service.fetch_has_unseen_notes().await.unwrap());
+    assert_eq!(executor.sent().len(), before + 1);
+}
+
+/// Every change waits in order: marking every note read, the notes, then the seen time.
+#[tokio::test]
+async fn waiting_changes_are_sent_in_order() {
+    let (service, executor) = service();
+    three_unread(&service, &executor).await;
+    executor.push(Step::Offline);
+    service.mark_read(note_ids(&[3])).await.unwrap();
+    executor.push(Step::Offline);
+    service.mark_seen(None).await.unwrap();
+    executor.push(Step::Offline);
+    service
+        .mark_all_read(NotificationTab::All, date(T + 2))
+        .await
+        .unwrap();
+    assert_eq!(service.pending_change_count().unwrap(), 3);
+
+    executor.push(Step::Respond(200, json!({ "success": true, "count": 2 })));
+    executor.push(Step::Respond(200, taken(&[])));
+    executor.push(Step::Respond(200, json!({ "success": true })));
+    assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+    let paths: Vec<String> = posts(&executor)
+        .into_iter()
+        .skip(3)
+        .map(|(path, _)| path)
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "/notifications/read/all?locale=en",
+            "/notifications/read?locale=en",
+            "/notifications/seen?locale=en"
+        ]
+    );
+    assert!(tab_shown(&service, NotificationTab::Unread).is_empty());
+}
+
+#[tokio::test]
+async fn each_account_keeps_its_own_changes() {
+    let cache = cache();
+    let (first, first_executor) = service_in(cache.clone(), USER, 3);
+    let (second, second_executor) = service_in(cache, WpComUserId(2), 3);
+    three_unread(&first, &first_executor).await;
+    three_unread(&second, &second_executor).await;
+    first_executor.push(Step::Offline);
+    first.mark_read(note_ids(&[3])).await.unwrap();
+    assert_eq!(first.pending_change_count().unwrap(), 1);
+    assert_eq!(second.pending_change_count().unwrap(), 0);
+    assert_eq!(tab_shown(&second, NotificationTab::Unread), [3, 2, 1]);
 }
