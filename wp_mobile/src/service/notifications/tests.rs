@@ -2656,6 +2656,64 @@ mod note_actions {
         assert_eq!(reader.pending_action_count().unwrap(), 0);
     }
 
+    /// Two `WpApiCache` objects of one database file, as an app that opens its file twice has,
+    /// and the folder the file is in, which goes when its guard is dropped.
+    fn two_caches_of_one_file() -> (tempfile::TempDir, Arc<WpApiCache>, Arc<WpApiCache>) {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let open = || {
+            let path = path.to_str().expect("a UTF-8 path").to_string();
+            Arc::new(WpApiCache::new(Some(path)).expect("the cache opens"))
+        };
+        let first = open();
+        first.perform_migrations().expect("migrations run");
+        (directory, first, open())
+    }
+
+    /// Each service has its own `WpApiCache` of the file, and both send what waits at once.
+    #[tokio::test]
+    async fn services_on_two_cache_objects_of_one_file_send_a_waiting_like_once() {
+        let (_directory, first, second) = two_caches_of_one_file();
+        let (service, executor) = service_in(first, USER, 10);
+        let reader = reader_in(&executor, second, USER);
+        assert!(Arc::ptr_eq(&service.actions.queue, &reader.actions().queue));
+
+        store(&service, &executor, &[comment(2, false)]).await;
+        executor.push(Step::Offline);
+        service
+            .set_comment_liked(NotificationId(id(2)), true)
+            .await
+            .unwrap();
+        assert_eq!(reader.pending_action_count().unwrap(), 1);
+
+        // The like's answer is held, so the second send starts while the first is in flight.
+        let sent = executor.sent().len();
+        let (release, held) = futures::channel::oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "success": true, "i_like": true, "like_count": 1 }),
+        ));
+        let (from_reader, from_service, ()) = tokio::join!(
+            reader.sync_actions(),
+            service.send_pending_changes(),
+            async { release.send(()).unwrap() }
+        );
+        assert_eq!(from_reader.unwrap(), 0);
+        assert_eq!(from_service.unwrap(), 0);
+        assert_eq!(
+            sent_after(&executor, sent),
+            [(
+                format!("/rest/v1.1/sites/{SITE}/comments/{COMMENT}/likes/new"),
+                None
+            )]
+        );
+        assert_eq!(
+            shown_action(&service, 2, NotificationActionKind::LikeComment),
+            Some(true)
+        );
+    }
+
     /// Each row carries its own source, so the service that sends it doesn't change what's sent.
     #[tokio::test]
     async fn the_readers_rows_keep_the_readers_source_when_the_notifications_service_sends_them() {

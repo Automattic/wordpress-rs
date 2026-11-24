@@ -1029,8 +1029,9 @@ fn tag_listed(
 /// A target a tap waits on: its action's kind and target.
 type Target = (i64, String);
 
-/// The sending of what the user turned on or off, one request at a time. There's one per account
-/// and [`WpApiCache`]: see [`ActionContext::new`].
+/// The sending of what the user turned on or off, one request at a time. An account has one in
+/// the process, whichever of its services and [`WpApiCache`] objects of its database exist: see
+/// [`WpApiCache::shared_state`].
 #[derive(Default)]
 pub(crate) struct ActionQueue {
     /// Held while rows are sent, so they go in order; while the Reader's other changes are sent
@@ -1086,15 +1087,15 @@ impl Drop for Waiting<'_> {
     }
 }
 
-/// What the queue's code runs on: the account, and its one [`ActionQueue`] on this cache. Each
-/// service of the account has one, with its own client.
+/// What the queue's code runs on: the account, and its one [`ActionQueue`]. Each service of the
+/// account has one, with its own client.
 pub(crate) struct ActionContext {
     pub(crate) client: WpComApiClient,
     pub(crate) cache: Arc<WpApiCache>,
     pub(crate) owner: ReaderOwner,
     /// The owner's row in the cache.
     pub(crate) owner_row: RowId,
-    /// The account's queue, which every service of the account on `cache` shares.
+    /// The account's queue, which every service of the account shares.
     pub(crate) queue: Arc<ActionQueue>,
 }
 
@@ -1860,13 +1861,12 @@ impl ReaderService {
     /// dropped it. No read says otherwise once the server has dropped a change, so nothing else
     /// is checked.
     ///
-    /// The account's changes on one `WpApiCache` are sent one at a time, in one lane, whichever of
-    /// the account's services made them: everything turned on or off (tags, likes, seen,
-    /// follows, blocks, a comment's like, comment subscriptions and a site's delivery settings,
-    /// including likes and follows made from a notification), [`Self::set_post_email_frequency`],
-    /// and the comments posted through [`Self::comments`]. So a tag change never overlaps another
-    /// of the account's changes, and [`Self::refresh_menu`] doesn't read the menu while one is
-    /// being sent.
+    /// The account's changes are sent one at a time, in one lane, whichever of the account's
+    /// services made them: everything turned on or off (tags, likes, seen, follows, blocks, a
+    /// comment's like, comment subscriptions and a site's delivery settings, including likes and
+    /// follows made from a notification), [`Self::set_post_email_frequency`], and the comments
+    /// posted through [`Self::comments`]. So a tag change never overlaps another of the account's
+    /// changes, and [`Self::refresh_menu`] doesn't read the menu while one is being sent.
     /// Saves aren't in that lane ([`Self::saved`] sends them in its own), nor are page views,
     /// which count a view rather than change the account; neither was measured beside a tag
     /// follow. Nothing here holds back another device or app signed in to the account.

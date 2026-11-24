@@ -4,7 +4,7 @@ use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
@@ -403,23 +403,69 @@ pub fn does_sqlite_support_returning(version: &str) -> bool {
     false
 }
 
-/// Values in memory that every service of one owner row on this cache shares, by row and type.
+/// Values in memory that every service of one owner row of a database shares, by row and type.
 type SharedState = Mutex<HashMap<(RowId, TypeId), Arc<dyn Any + Send + Sync>>>;
+
+/// Tells one database file from another. Two paths to one file are equal. A file made where
+/// another was deleted isn't equal to it, while that one is still open.
+#[cfg(unix)]
+type FileIdentity = (u64, u64);
+#[cfg(not(unix))]
+type FileIdentity = std::path::PathBuf;
+
+/// The [`SharedState`] of each database file open in this process, so every [`WpApiCache`] of
+/// one file has the same. An entry is dead once the file's last `WpApiCache` is dropped.
+static SHARED_STATE_BY_FILE: LazyLock<Mutex<HashMap<FileIdentity, Weak<SharedState>>>> =
+    LazyLock::new(Default::default);
+
+/// Returns the [`SharedState`] of `connection`'s database: the one its file already has in this
+/// process, or a new one. A database with no file, such as one in memory, gets its own.
+fn shared_state_of(connection: &Connection) -> Arc<SharedState> {
+    let Some(file) = connection.path().and_then(file_identity) else {
+        return Arc::default();
+    };
+    let mut by_file = SHARED_STATE_BY_FILE
+        .lock()
+        .expect("shared state registry lock poisoned");
+    by_file.retain(|_, shared| shared.strong_count() > 0);
+    if let Some(shared) = by_file.get(&file).and_then(Weak::upgrade) {
+        return shared;
+    }
+    let shared = Arc::<SharedState>::default();
+    by_file.insert(file, Arc::downgrade(&shared));
+    shared
+}
+
+/// Returns the [`FileIdentity`] of the file at `path`, or `None` if there's no such file.
+fn file_identity(path: &str) -> Option<FileIdentity> {
+    if path.is_empty() {
+        return None;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = std::fs::metadata(path).ok()?;
+        Some((metadata.dev(), metadata.ino()))
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::canonicalize(path).ok()
+    }
+}
 
 #[derive(uniffi::Object)]
 pub struct WpApiCache {
     inner: DBManager,
-    shared: SharedState,
+    shared: Arc<SharedState>,
 }
 
 #[uniffi::export]
 impl WpApiCache {
     #[uniffi::constructor]
     pub fn new(path: Option<String>) -> Result<Self, SqliteDbError> {
-        Ok(Self {
-            inner: DBManager::new(&path)?,
-            shared: SharedState::default(),
-        })
+        let inner = DBManager::new(&path)?;
+        let shared = shared_state_of(&inner.connection.lock().expect("connection lock poisoned"));
+        Ok(Self { inner, shared })
     }
 
     pub fn perform_migrations(&self) -> Result<i64, SqliteDbError> {
@@ -598,9 +644,10 @@ impl WpApiCache {
         f(&mut conn)
     }
 
-    /// Returns the one `T` that every service of `owner_row` on this cache object shares, made
-    /// the first time it's asked for. It's in memory only, and lives as long as this object:
-    /// another `WpApiCache`, even of the same file, has its own. Removing the owner drops it.
+    /// Returns the one `T` that every service of `owner_row` shares, made the first time it's
+    /// asked for. It's in memory only. Every `WpApiCache` of one database file in this process
+    /// returns the same `T`, which lives until the last of them is dropped. A database with no
+    /// file, such as one in memory, has its own. Removing the owner drops it.
     pub fn shared_state<T: Default + Send + Sync + 'static>(&self, owner_row: RowId) -> Arc<T> {
         let value = self
             .shared
@@ -643,11 +690,12 @@ impl TryFrom<Connection> for WpApiCache {
     fn try_from(connection: Connection) -> Result<Self, Self::Error> {
         enable_foreign_keys(&connection)?;
         register_url_functions(&connection)?;
+        let shared = shared_state_of(&connection);
         Ok(Self {
             inner: DBManager {
                 connection: Mutex::new(connection),
             },
-            shared: SharedState::default(),
+            shared,
         })
     }
 }
@@ -924,6 +972,139 @@ mod tests {
             "WpApiCache::try_from must enable foreign key enforcement rather than \
              inherit whatever the incoming connection had"
         );
+    }
+
+    /// Something a test keeps in a cache's shared state.
+    #[derive(Default)]
+    struct Marker;
+
+    fn open_cache(path: &std::path::Path) -> WpApiCache {
+        let path = path.to_str().expect("a UTF-8 path").to_string();
+        WpApiCache::new(Some(path)).expect("the cache opens")
+    }
+
+    #[test]
+    fn test_every_cache_of_one_file_has_the_same_shared_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let first = open_cache(&path);
+        let second = open_cache(&path);
+        let row = RowId(1);
+
+        let shared = first.shared_state::<Marker>(row);
+        assert!(Arc::ptr_eq(&shared, &first.shared_state(row)));
+        assert!(Arc::ptr_eq(&shared, &second.shared_state(row)));
+        assert!(!Arc::ptr_eq(&shared, &second.shared_state(RowId(2))));
+
+        let other_file = open_cache(&directory.path().join("other.sqlite"));
+        assert!(!Arc::ptr_eq(&shared, &other_file.shared_state(row)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_a_cache_opened_by_another_path_to_the_file_has_the_same_shared_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let first = open_cache(&path);
+        let link = directory.path().join("link.sqlite");
+        std::os::unix::fs::symlink(&path, &link).unwrap();
+        let second = open_cache(&link);
+
+        assert!(Arc::ptr_eq(
+            &first.shared_state::<Marker>(RowId(1)),
+            &second.shared_state(RowId(1))
+        ));
+    }
+
+    /// A `file:` address is how the Swift wrapper opens a cache from a `URL`.
+    #[test]
+    fn test_a_cache_opened_by_a_file_uri_has_the_same_shared_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let first = open_cache(&path);
+        let uri = format!("file://{}", path.to_str().expect("a UTF-8 path"));
+        let second = WpApiCache::new(Some(uri)).expect("the cache opens");
+
+        assert!(Arc::ptr_eq(
+            &first.shared_state::<Marker>(RowId(1)),
+            &second.shared_state(RowId(1))
+        ));
+    }
+
+    #[test]
+    fn test_a_cache_in_memory_has_shared_state_of_its_own() {
+        let in_memory = || Some(":memory:".to_string());
+        let first = WpApiCache::new(None).unwrap();
+        let shared = first.shared_state::<Marker>(RowId(1));
+        for other in [
+            WpApiCache::new(None).unwrap(),
+            WpApiCache::new(in_memory()).unwrap(),
+            WpApiCache::new(in_memory()).unwrap(),
+            WpApiCache::try_from(Connection::open_in_memory().unwrap()).unwrap(),
+        ] {
+            assert!(!Arc::ptr_eq(&shared, &other.shared_state(RowId(1))));
+        }
+        let named = WpApiCache::new(in_memory()).unwrap();
+        assert!(!Arc::ptr_eq(
+            &named.shared_state::<Marker>(RowId(1)),
+            &WpApiCache::new(in_memory()).unwrap().shared_state(RowId(1))
+        ));
+    }
+
+    #[test]
+    fn test_a_files_shared_state_lasts_until_its_last_cache_is_dropped() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let first = open_cache(&path);
+        let second = open_cache(&path);
+        let shared = Arc::downgrade(&first.shared_state::<Marker>(RowId(1)));
+
+        drop(first);
+        assert!(shared.upgrade().is_some());
+        drop(second);
+        assert!(shared.upgrade().is_none());
+
+        // Whoever opens the file next starts with shared state of its own.
+        let reopened = open_cache(&path);
+        let _again = reopened.shared_state::<Marker>(RowId(1));
+        assert!(shared.upgrade().is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_a_file_made_where_another_was_deleted_has_shared_state_of_its_own() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let first = open_cache(&path);
+        let shared = first.shared_state::<Marker>(RowId(1));
+
+        std::fs::remove_file(&path).unwrap();
+        let second = open_cache(&path);
+        assert!(!Arc::ptr_eq(&shared, &second.shared_state(RowId(1))));
+    }
+
+    #[test]
+    fn test_removing_an_account_drops_its_shared_state_in_every_cache_of_the_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let first = open_cache(&path);
+        first.perform_migrations().unwrap();
+        let second = open_cache(&path);
+        let account = |user_id| {
+            first
+                .execute(|connection| {
+                    WordPressComAccountRepository::get_or_create(connection, WpComUserId(user_id))
+                })
+                .unwrap()
+        };
+        let (removed, kept) = (account(1), account(2));
+        let removed_state = first.shared_state::<Marker>(removed);
+        let kept_state = first.shared_state::<Marker>(kept);
+
+        assert!(second.remove_wordpress_com_account(WpComUserId(1)).unwrap());
+
+        assert!(!Arc::ptr_eq(&removed_state, &first.shared_state(removed)));
+        assert!(Arc::ptr_eq(&kept_state, &first.shared_state(kept)));
     }
 
     #[test]
