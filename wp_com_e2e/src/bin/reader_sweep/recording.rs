@@ -11,28 +11,14 @@
 //!
 //! Request headers are never written, so the access token isn't either.
 
-use async_trait::async_trait;
+use crate::sweep_support::Captured;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
-use wp_api::prelude::*;
-use wp_api::request::{RequestContext, WpMultipartFormRequest};
-
-/// A response the sweep received, held until it's known whether it's worth keeping.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Captured {
-    pub seq: u64,
-    pub method: String,
-    pub url: String,
-    pub status: u32,
-    pub millis: u64,
-    pub body: Vec<u8>,
-}
 
 /// One line of `index.jsonl`.
 #[derive(Debug, Serialize)]
@@ -76,7 +62,8 @@ pub struct IndexLine<'a> {
 /// Writes a run's files. Shared by every worker.
 pub struct Recorder {
     dir: PathBuf,
-    seq: AtomicU64,
+    /// Numbers the run's responses: every worker's executor shares it.
+    seq: Arc<AtomicU64>,
     index: Mutex<File>,
     anomalies: Mutex<File>,
 }
@@ -94,14 +81,15 @@ impl Recorder {
         };
         Ok(Self {
             dir: dir.to_path_buf(),
-            seq: AtomicU64::new(0),
+            seq: Arc::new(AtomicU64::new(0)),
             index: Mutex::new(new_file("index.jsonl")?),
             anomalies: Mutex::new(new_file("anomalies.jsonl")?),
         })
     }
 
-    fn next_seq(&self) -> u64 {
-        self.seq.fetch_add(1, Ordering::SeqCst) + 1
+    /// The counter that numbers the run's responses, for each worker's executor.
+    pub fn sequence(&self) -> Arc<AtomicU64> {
+        Arc::clone(&self.seq)
     }
 
     /// Writes a response's body, and returns its path within the run's directory.
@@ -134,71 +122,14 @@ fn append(file: &Mutex<File>, line: &impl Serialize) -> io::Result<()> {
         .write_all(text.as_bytes())
 }
 
-/// A request executor that holds on to each response before handing it back.
-///
-/// Each worker has its own, so [`Self::take_last`] is the response to that worker's last request.
-pub struct RecordingExecutor {
-    inner: Arc<dyn RequestExecutor>,
-    recorder: Arc<Recorder>,
-    last: Mutex<Option<Captured>>,
-}
-
-impl RecordingExecutor {
-    pub fn new(inner: Arc<dyn RequestExecutor>, recorder: Arc<Recorder>) -> Self {
-        Self {
-            inner,
-            recorder,
-            last: Mutex::new(None),
-        }
-    }
-
-    /// The response received since the last call, if the last request got one.
-    pub fn take_last(&self) -> Option<Captured> {
-        self.last.lock().expect("last lock poisoned").take()
-    }
-}
-
-#[async_trait]
-impl RequestExecutor for RecordingExecutor {
-    async fn execute(
-        &self,
-        request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        let started = Instant::now();
-        let result = self.inner.execute(request).await;
-        if let Ok(response) = &result {
-            *self.last.lock().expect("last lock poisoned") = Some(Captured {
-                seq: self.recorder.next_seq(),
-                method: format!("{:?}", response.request_method),
-                url: response.request_url.0.clone(),
-                status: response.status_code,
-                millis: started.elapsed().as_millis() as u64,
-                body: response.body.clone(),
-            });
-        }
-        result
-    }
-
-    async fn upload(
-        &self,
-        request: Arc<WpMultipartFormRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.inner.upload(request).await
-    }
-
-    async fn sleep(&self, millis: u64) {
-        self.inner.sleep(millis).await
-    }
-
-    fn cancel(&self, context: Arc<RequestContext>) {
-        self.inner.cancel(context)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sweep_support::RecordingExecutor;
+    use async_trait::async_trait;
+    use wp_api::prelude::*;
     use wp_api::request::endpoint::WpEndpointUrl;
+    use wp_api::request::{RequestContext, WpMultipartFormRequest};
 
     struct Fixed {
         body: &'static str,
@@ -250,7 +181,7 @@ mod tests {
         let dir = temp_dir("bodies");
         let recorder = Arc::new(Recorder::create(&dir).unwrap());
         let body = "{\"posts\": [ ] }\n";
-        let executor = RecordingExecutor::new(Arc::new(Fixed { body }), Arc::clone(&recorder));
+        let executor = RecordingExecutor::new(Arc::new(Fixed { body }), recorder.sequence());
 
         executor.execute(request()).await.unwrap();
         let first = executor.take_last().unwrap();

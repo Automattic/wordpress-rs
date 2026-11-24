@@ -72,6 +72,37 @@ The Kotlin step builds for the **host**, not Android, so it needs no NDK. Only
 > No output means the framework predates your change — rebuild before trusting
 > a green build.
 
+## Checking notification work against the private sample
+
+The private sample is a folder of real WordPress.com notifications, one note per line in `.jsonl` files, that is
+kept on one machine and never enters the repository. Neither CI nor anyone without the folder can run these
+tests, so run them yourself on the machine that holds it.
+
+The corpus test reads every note in the sample with the library's model, and reports counts, note types and key
+paths:
+
+```bash
+NOTIFICATIONS_CORPUS=/path/to/sample cargo test -p wp_api --lib \
+    wp_com::notifications::corpus -- --ignored --nocapture
+```
+
+The fixture check fails when any notification fixture or hand-built test input shares a value with the sample: a
+number of six or more digits, a hash, a URL's host, or a word of seven or more letters. It reads every file Git
+would commit whose path contains `notification` or `styled_text`, and takes about a minute:
+
+```bash
+NOTIFICATIONS_CORPUS=/path/to/sample cargo test -p wp_api --lib \
+    wp_com::notifications::fixture_check -- --ignored --nocapture
+```
+
+**The fixture check must pass before notification work is pushed.** When it fails, it names each shared token and
+the file it's in: replace each with an invented value. Write fixtures by hand rather than copying a note from the
+sample. Both tests take several folders, separated by `:`.
+
+The fixture check fails when `NOTIFICATIONS_CORPUS` isn't set or names a missing folder, and says that nothing
+was checked. To see that it catches a copied note, put a note in a folder outside the checkout and name that
+folder in `NOTIFICATIONS_FIXTURE_CHECK_EXTRA`; the check reads its files as if they were in the repository.
+
 ## Signing an example app into WordPress.com
 
 The Swift and Android example apps read a WordPress.com bearer token at launch and store it as

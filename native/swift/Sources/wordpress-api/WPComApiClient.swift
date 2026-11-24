@@ -139,6 +139,11 @@ public final class WPComApiClient: Sendable {
         internalClient.readerComments()
     }
 
+    /// The user's notifications: a page of them, their IDs and hashes, or one note.
+    public var notifications: NotificationsRequestExecutor {
+        internalClient.notifications()
+    }
+
     /// A WordPress.com user's public profile, as the Reader shows it.
     public var readerUsers: ReaderUsersRequestExecutor {
         internalClient.readerUsers()

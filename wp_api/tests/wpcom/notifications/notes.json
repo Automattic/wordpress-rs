@@ -1,0 +1,203 @@
+{
+  "last_seen_time": "1767312000",
+  "number": 4,
+  "notes": [
+    {
+      "id": 10000000004,
+      "type": "comment",
+      "read": 0,
+      "noticon": "",
+      "timestamp": "2026-01-03T10:20:30+00:00",
+      "icon": "https://example.com/avatars/sam.png",
+      "url": "https://example.com/2026/01/02/hello-world/#comment-501",
+      "title": "Comment",
+      "note_hash": 4000000001,
+      "subject": [
+        {
+          "text": "Sam Example commented on Hello World",
+          "ranges": [
+            { "type": "user", "indices": [0, 11], "id": 701, "parent": null, "site_id": 801, "url": "https://sam.example.org" },
+            { "type": "post", "indices": [25, 36], "id": 601, "parent": null, "site_id": 801, "url": "https://example.com/2026/01/02/hello-world/" }
+          ]
+        },
+        {
+          "text": "Great post! I learned a lot.",
+          "ranges": [
+            { "type": "comment", "indices": [0, 28], "id": 501, "parent": null, "post_id": 601, "site_id": 801, "url": "https://example.com/2026/01/02/hello-world/#comment-501" }
+          ]
+        }
+      ],
+      "header": [
+        {
+          "text": "Sam Example",
+          "ranges": [ { "type": "user", "indices": [0, 11], "id": 701, "parent": null, "site_id": 801, "url": "https://sam.example.org" } ],
+          "media": [ { "type": "image", "indices": [0, 0], "url": "https://example.com/avatars/sam.png", "height": "256", "width": "256", "id": "1", "parent": null } ]
+        },
+        {
+          "text": "Hello World",
+          "ranges": [ { "type": "post", "indices": [0, 11], "id": 601, "parent": null, "site_id": 801, "url": "https://example.com/2026/01/02/hello-world/" } ]
+        }
+      ],
+      "body": [
+        {
+          "text": "Sam Example",
+          "type": "user",
+          "ranges": [ { "type": "user", "indices": [0, 11], "id": 701, "parent": null, "site_id": 801, "url": "https://sam.example.org" } ],
+          "media": [ { "type": "image", "indices": [0, 0], "url": "https://example.com/avatars/sam.png", "height": "256", "width": "256" } ],
+          "actions": { "follow": false },
+          "meta": {
+            "ids": { "user": 701, "site": 802 },
+            "links": { "user": "https://public-api.wordpress.com/rest/v1/users/701", "home": "https://sam.example.org" },
+            "titles": { "home": "Sam's Garden", "tagline": "Notes from the garden" }
+          }
+        },
+        {
+          "text": "Great post! I learned a lot.",
+          "type": "comment",
+          "nest_level": 0,
+          "edit_comment_link": "https://example.com/wp-admin/comment.php?action=editcomment&c=501",
+          "moderate_comments_link": "https://example.com/wp-admin/edit-comments.php",
+          "ranges": [
+            { "type": "p", "indices": [0, 28], "id": "10", "parent": null },
+            { "type": "b", "indices": [0, 10], "id": "11", "parent": "10" }
+          ],
+          "actions": {
+            "spam-comment": false,
+            "trash-comment": false,
+            "approve-comment": true,
+            "edit-comment": true,
+            "replyto-comment": true,
+            "like-comment": false
+          },
+          "meta": {
+            "ids": { "comment": 501, "post": 601, "site": 801, "user": 701 },
+            "links": {
+              "comment": "https://public-api.wordpress.com/rest/v1/comments/501",
+              "post": "https://public-api.wordpress.com/rest/v1/posts/601",
+              "site": "https://public-api.wordpress.com/rest/v1/sites/801",
+              "user": "https://public-api.wordpress.com/rest/v1/users/701"
+            }
+          }
+        }
+      ],
+      "meta": {
+        "ids": { "site": 801, "post": 601, "comment": 501, "user": 701, "parent_comment": 500 },
+        "links": {
+          "site": "https://public-api.wordpress.com/rest/v1/sites/801",
+          "post": "https://public-api.wordpress.com/rest/v1/posts/601",
+          "comment": "https://public-api.wordpress.com/rest/v1/comments/501",
+          "user": "https://public-api.wordpress.com/rest/v1/users/701",
+          "parent_comment": "https://public-api.wordpress.com/rest/v1/comments/500"
+        },
+        "actor": { "name": "Sam Example", "avatar": "https://example.com/avatars/sam.png", "url": null },
+        "actor_count": 1,
+        "summary": {
+          "text": "Sam Example commented on your post",
+          "ranges": [ { "type": "user", "indices": [0, 11], "id": 701, "parent": null } ]
+        },
+        "post": {
+          "title": "Hello World",
+          "url": "https://example.com/2026/01/02/hello-world/",
+          "date": "2026-01-02T08:00:00+00:00",
+          "author_name": "Alex Author",
+          "author_avatar": "https://example.com/avatars/alex.png"
+        },
+        "site": { "name": "Example Site", "icon": "https://example.com/icon.png", "url": "https://example.com" },
+        "parent_comment": {
+          "text": "What did everyone think?",
+          "content": { "text": "What did everyone think?", "ranges": [ { "type": "p", "indices": [0, 24], "id": "1", "parent": null } ] },
+          "url": "https://example.com/2026/01/02/hello-world/#comment-500",
+          "date": "2026-01-03T09:00:00+00:00",
+          "author_name": "Alex Author",
+          "author_avatar": "https://example.com/avatars/alex.png",
+          "author_url": "https://example.com"
+        }
+      }
+    },
+    {
+      "id": 10000000003,
+      "type": "like",
+      "read": 1,
+      "noticon": "",
+      "timestamp": "2026-01-02T12:00:00+00:00",
+      "icon": "https://example.com/avatars/kim.png",
+      "url": "https://example.com/2026/01/02/hello-world/",
+      "title": "Like",
+      "note_hash": 4000000002,
+      "subject": [
+        {
+          "text": "Kim Example and 2 others liked Hello World",
+          "ranges": [
+            { "type": "b", "indices": [0, 11], "id": 702, "parent": null },
+            { "type": "post", "indices": [31, 42], "id": 601, "parent": null, "site_id": 801 }
+          ]
+        }
+      ],
+      "body": [
+        {
+          "text": "Kim Example",
+          "type": "user",
+          "ranges": [ { "type": "user", "indices": [0, 11], "id": 702, "parent": null, "site_id": 803 } ],
+          "actions": { "follow": true },
+          "meta": { "ids": { "user": 702, "site": 803 }, "links": [] }
+        }
+      ],
+      "meta": {
+        "ids": { "site": 801, "post": 601 },
+        "links": {
+          "site": "https://public-api.wordpress.com/rest/v1/sites/801",
+          "post": "https://public-api.wordpress.com/rest/v1/posts/601"
+        },
+        "actor": { "name": "Kim Example", "avatar": "https://example.com/avatars/kim.png", "url": "https://kim.example.net" },
+        "actor_count": 3
+      }
+    },
+    {
+      "id": 10000000002,
+      "type": "example_reminder_note",
+      "subtype": "monthly",
+      "variant": "v2",
+      "read": 0,
+      "noticon": "",
+      "timestamp": "2026-01-01T00:00:00+00:00",
+      "icon": "https://example.com/badges/reminder.png",
+      "url": "",
+      "title": "Reminder",
+      "note_hash": 4000000003,
+      "subject": [ { "text": "Time to write your monthly post" } ],
+      "body": [
+        {
+          "text": "Your readers miss you.",
+          "media": [ { "type": "badge", "indices": [0, 0], "url": "https://example.com/badges/reminder.png", "height": "100%", "width": "100%" } ],
+          "ranges": [
+            { "type": "tracks", "indices": [5, 12], "id": "3", "parent": null, "url": "https://example.com/new", "context": "example_reminder_clicked" },
+            { "type": "example_highlight", "indices": [13, 22], "id": "4", "parent": null }
+          ]
+        },
+        {
+          "text": "Write a post",
+          "ranges": [ { "type": "button", "indices": [0, 12], "id": "5", "parent": null, "url": "https://example.com/new", "class": "example-button" } ],
+          "meta": { "is_mobile_button": true }
+        }
+      ],
+      "meta": {
+        "ids": { "site": 801, "order": 901 },
+        "links": { "site": "https://public-api.wordpress.com/rest/v1/sites/801", "order": "https://example.com/orders/901" }
+      }
+    },
+    {
+      "id": 10000000001,
+      "type": "follow",
+      "read": 1,
+      "noticon": "",
+      "timestamp": "1970-01-01T00:00:00+00:00",
+      "icon": "https://example.com/avatars/lee.png",
+      "url": "https://example.com",
+      "title": "Follow",
+      "note_hash": 4000000004,
+      "subject": [ { "text": "Lee Example followed Example Site", "ranges": [ { "type": "user", "indices": [0, 11], "id": 703, "parent": null }, { "type": "site", "indices": [21, 33], "id": 801, "parent": null, "site_id": 801 } ] } ],
+      "body": [],
+      "meta": { "ids": { "site": 801 }, "links": { "site": "https://public-api.wordpress.com/rest/v1/sites/801" } }
+    }
+  ]
+}
