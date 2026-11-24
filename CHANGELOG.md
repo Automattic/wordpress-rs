@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Internal:** The `wp_rs_web` Docker image starts again. Its runtime stage used Debian bookworm while the binary was built on trixie, so it exited at launch with `GLIBC_2.38' not found`. CI now starts the image and requests its home page on pull requests that can affect it, and before each publish.
+- **Internal:** Use Ruby 3.4.13 for automation tooling, and run Mac CI on the `xcode-27.2-v3` image, which ships it.
 
 ## [0.11.1] - 2026-11-18
 
