@@ -84,17 +84,9 @@ http_server_error = Kan inte ansluta till server: { $reason }. Kontakta din serv
 
 http_authentication_rejected_error = Servern på { $url } avvisade dina autentiseringsuppgifter. Ange ett giltigt användarnamn och lösenord.
 
-http_timeout_error = Anslutning timeout
-
 http_forbidden_error = Servern på { $url } nekade åtkomst till den begärda resursen. Kontrollera din webbplats konfiguration.
 
 http_authentication_required_error = Servern på { $url } kräver autentisering. Ange ditt användarnamn och lösenord.
-
-non_existent_site_error = En server med specificerat webbhotell kunde inte hittas.
-
-invalid_ssl_error_generic_ssl_error = Kan inte etablera en säker anslutning till servern
-
-invalid_ssl_error_certificate_not_valid_for_name = Ogiltigt SSL-ceritfikat
 
 just = { $message }
 

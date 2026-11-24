@@ -113,3 +113,24 @@ adb shell am start -S -n rs.wordpress.example/.ui.welcome.WelcomeActivity --es w
 
 Either way, the token briefly appears in the process list while the launch command runs; that's
 inherent to passing it as a launch argument.
+
+## Running the TLS tests against a local badssl.com
+
+A few login tests check how TLS failures are reported, against a copy of
+[badssl.com](https://badssl.com) that `scripts/badssl-server.sh` runs rather than the live site,
+which sometimes drops connections. They skip unless `BADSSL_DOMAIN` is set.
+
+On a laptop, run the copy in Docker. It serves `*.badssl.localhost` on port 443:
+
+```bash
+docker compose up -d --build badssl
+BADSSL_DOMAIN=badssl.localhost swift test --filter LoginTests
+```
+
+`make test-server` starts it too, and `make test-kotlin-integration` runs the Kotlin tests against
+it as CI does.
+
+The copy's certificates are signed by a root it generates. CI trusts that root in the simulators
+and in the Kotlin tests' Java runtime; don't add it to a laptop's trust store. Without it, as on a
+laptop and in CI's macOS and Mac Catalyst runs, the Swift tests see an unknown root as well as the
+name mismatch. The Swift executor reports both the same way for now (#1498), so they still pass.
