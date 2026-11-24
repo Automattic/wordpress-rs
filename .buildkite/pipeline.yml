@@ -17,7 +17,8 @@ common_params:
     # - '6.4'
     # - '6.5'
     # - '6.6'
-    - "6.8.1"
+    # TEMP: test WordPress 7.2 RC3. Restore "6.8.1" before merging anything.
+    - "7.2-RC3"
 
 steps:
   #
