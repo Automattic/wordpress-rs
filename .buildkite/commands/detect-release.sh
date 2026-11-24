@@ -75,8 +75,7 @@ echo "--- :pipeline: Uploading release step for $version"
 cat <<YAML | buildkite-agent pipeline upload
 steps:
   - label: ":rocket: Publish release $version"
-    # Temporary: drop RBENV_VERSION once .ruby-version is 3.4.13 (AINFRA-3882); the Linux agents lack it until AINFRA-3889/3890/3891.
-    command: RBENV_VERSION=3.4.13 .buildkite/release.sh "$version"
+    command: .buildkite/release.sh "$version"
     depends_on: "swift"
     agents:
       queue: mac
