@@ -8,8 +8,6 @@ parse_api_root_failure_reason_wordfence_blocking_access = Wordfence يمنع ا�
 
 parse_api_root_failure_reason_server_fatal_error = واجه خادمك خطأ لا يمكن استرداده وبالتالي تعذّر عليه معالجة الطلب. يرجى التحقق من سجلات أخطاء الخادم لديك للحصول على التفاصيل.
 
-parse_api_root = لقد تعذّر تحليل استجابة جذر REST API للموقع.
-
 application_passwords_not_supported = لا يدعم هذا الموقع كلمات مرور التطبيقات.
 
 application_passwords_disabled_for_http_site = لم يتم تمكين «كلمات مرور التطبيقات» لهذا الموقع — ويرجع ذلك على الأرجح إلى عدم تمكننا من إنشاء اتصال آمن به. يرجى إضافة شهادة SSL إلى هذا الموقع ثم المحاولة مجددا.
@@ -66,17 +64,9 @@ http_server_error = تعذر الاتصال بالخادم: { $reason }. يرج�
 
 http_authentication_rejected_error = رفض الخادم الموجود على { $url } بيانات اعتمادك. يرجى تقديم اسم مستخدم وكلمة مرور صحيحين.
 
-http_timeout_error = انتهى وقت الاتصال
-
 http_forbidden_error = رفض الخادم الموجود على الرابط { $url } الوصول إلى المورد المطلوب. يرجى التحقق من إعدادات موقعك.
 
 http_authentication_required_error = الخادم الموجود على الرابط { $url } يتطلب المصادقة. يرجى تقديم اسم المستخدم وكلمة المرور.
-
-non_existent_site_error = تعذر العثور على الخادم الذي يحمل اسم المضيف المحدد.
-
-invalid_ssl_error_generic_ssl_error = تعذر إنشاء اتصال آمن بالخادم
-
-invalid_ssl_error_certificate_not_valid_for_name = شهادة SSL غير صالحة
 
 just = { $message }
 

@@ -30,6 +30,12 @@ else
 
     echo "Runing on device: ${device_name}"
 
+    # Trust the root of the badssl.com copy CI runs. A simulator must be booted to change its trust.
+    if [ -n "${BADSSL_ROOT_CERT:-}" ]; then
+        xcrun simctl bootstatus "${device_id}" -b
+        xcrun simctl keychain "${device_id}" add-root-cert "${BADSSL_ROOT_CERT}"
+    fi
+
     destination="id=${device_id}"
 fi
 

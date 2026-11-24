@@ -58,3 +58,6 @@ wp_com_test_credentials.json
 
 # Cargo config
 !.cargo/config.toml
+
+# The local copy of badssl.com (scripts/badssl-server.sh)
+.badssl/

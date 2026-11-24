@@ -4,8 +4,6 @@ parse_api_root_failure_reason_wordfence_blocking_access = O Wordfence está bloq
 
 parse_api_root_failure_reason_server_fatal_error = Seu servidor encontrou um erro irrecuperável e não pôde processar a solicitação. Por favor, verifique os logs de erro do seu servidor para detalhes.
 
-parse_api_root = Falha ao analisar a resposta raiz da API REST do WordPress do site.
-
 application_passwords_not_supported = O site não suporta Senhas de Aplicativo.
 
 application_passwords_disabled_for_http_site = Senhas de Aplicativo não estão habilitadas para este site – isso provavelmente é porque não conseguimos estabelecer uma conexão segura com ele. Por favor, adicione um certificado SSL a este site e tente novamente.
@@ -62,17 +60,9 @@ http_server_error = Não foi possível conectar ao servidor: { $reason }. Por fa
 
 http_authentication_rejected_error = O servidor em { $url } rejeitou suas credenciais. Por favor, forneça um nome de usuário e senha válidos.
 
-http_timeout_error = A conexão expirou
-
 http_forbidden_error = O servidor em { $url } negou acesso ao recurso solicitado. Por favor, verifique a configuração do seu site.
 
 http_authentication_required_error = O servidor em { $url } requer autenticação. Por favor, forneça seu nome de usuário e senha.
-
-non_existent_site_error = Um servidor com o nome de host especificado não pôde ser encontrado.
-
-invalid_ssl_error_generic_ssl_error = Não foi possível estabelecer uma conexão segura com o servidor
-
-invalid_ssl_error_certificate_not_valid_for_name = Certificado SSL inválido
 
 just = { $message }
 
