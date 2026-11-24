@@ -319,6 +319,59 @@ impl NotificationRepository {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
+    /// The stored note `note_id`, as [`Self::select`] returns it, or `None` when it isn't stored.
+    pub fn select_one(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        note_id: NotificationId,
+    ) -> Result<Option<DbNotification>, SqliteDbError> {
+        let sql = format!(
+            "SELECT n.rowid, n.note_id, n.json, {SHOWN_READ} FROM notifications n {SHOWN_READ_JOINS} \
+             WHERE n.account_id = ?1 AND n.note_id = ?2"
+        );
+        let mut statement = executor.prepare(&sql)?;
+        Ok(statement
+            .query_row(params![account, note_id.0], |row| {
+                Ok(DbNotification {
+                    row_id: row.get(0)?,
+                    note_id: NotificationId(row.get(1)?),
+                    json: row.get(2)?,
+                    read: row.get(3)?,
+                })
+            })
+            .optional()?)
+    }
+
+    /// The ID and JSON of each of the account's stored notes whose JSON has `text` in it.
+    pub fn select_json_containing(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        text: &str,
+    ) -> Result<Vec<(NotificationId, String)>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT note_id, json FROM notifications WHERE account_id = ?1 AND instr(json, ?2) > 0",
+        )?;
+        let rows = statement.query_map(params![account, text], |row| {
+            Ok((NotificationId(row.get(0)?), row.get(1)?))
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Replaces a stored note's JSON, keeping its hash and the columns a list sorts and filters
+    /// by. For a change the server took that its stored copy doesn't have yet.
+    pub fn set_json(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        note_id: NotificationId,
+        json: &str,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE notifications SET json = ?3 WHERE account_id = ?1 AND note_id = ?2",
+            params![account, note_id.0, json],
+        )?;
+        Ok(())
+    }
+
     /// The time of the newest dated note that passes `filter`, as [`Self::select`] filters, in
     /// seconds since 1970.
     pub fn newest_time(

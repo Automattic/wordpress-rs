@@ -86,16 +86,16 @@ class WpComApiClient(
     ): ReaderService = ReaderService(delegate, cache.cache, owner, savedSource)
 
     /**
-     * Creates the notifications service for one account. It keeps the account's notes in [cache],
-     * syncs the newest by comparing hashes, and loads older ones a page at a time. Every request
-     * it sends is a GET.
+     * Creates the notifications service for [reader]'s account. It keeps the account's notes in
+     * [reader]'s cache, syncs the newest by comparing hashes, and loads older ones a page at a time.
+     * Its syncs send only GET requests.
      *
-     * The cache's migrations must have run. Create one per account and share it.
+     * Likes and follows made from a note go through [reader]'s queue, so pass the app's one Reader
+     * service for the account, made with [makeReaderService]. An app that shows no Reader still
+     * makes one. Throws for the signed-out reader's. Create one per account and share it.
      */
-    fun makeNotificationService(
-        cache: WordPressApiCache,
-        userId: ULong
-    ): NotificationService = NotificationService(delegate, cache.cache, userId)
+    fun makeNotificationService(reader: ReaderService): NotificationService =
+        NotificationService(delegate, reader)
 
     // Provides the _only_ way to execute authenticated requests using our Kotlin wrapper.
     //

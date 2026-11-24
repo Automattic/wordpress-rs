@@ -188,16 +188,16 @@ public final class WPComApiClient: Sendable {
         try ReaderService(delegate: delegate, cache: cache.cache, owner: owner, savedSource: savedSource)
     }
 
-    /// Creates the notifications service for one account. It keeps the account's notes in
-    /// `cache`, syncs the newest by comparing hashes, and loads older ones a page at a time. Every
-    /// request it sends is a GET.
+    /// Creates the notifications service for `reader`'s account. It keeps the account's notes in
+    /// `reader`'s cache, syncs the newest by comparing hashes, and loads older ones a page at a
+    /// time. Its syncs send only GET requests.
     ///
-    /// The cache's migrations must have run. Create one per account and share it.
-    public func makeNotificationService(
-        cache: WordPressApiCache,
-        userID: WpComUserId
-    ) throws -> NotificationService {
-        try NotificationService(delegate: delegate, cache: cache.cache, userId: userID)
+    /// Likes and follows made from a note go through `reader`'s queue, so pass the app's one
+    /// Reader service for the account, made with `makeReaderService`. An app that shows no
+    /// Reader still makes one. Throws for the signed-out reader's. Create one per account and
+    /// share it.
+    public func makeNotificationService(reader: ReaderService) throws -> NotificationService {
+        try NotificationService(delegate: delegate, reader: reader)
     }
 
     public var supportBots: SupportBotsRequestExecutor {

@@ -25,7 +25,8 @@
 //!   another tab downloaded isn't downloaded again. A note missing from the Unread tab's list
 //!   may only have been read, so that list never removes a note.
 //!
-//! Marking notes read, unread and seen is in the `changes` module.
+//! Marking notes read, unread and seen is in the `changes` module, and liking and following from
+//! a note in the `note_actions` module.
 
 use futures::lock::Mutex as AsyncMutex;
 use std::collections::{HashMap, HashSet};
@@ -44,8 +45,10 @@ use wp_mobile_cache::repository::notifications::{
     DbKnownHash, DbNotificationFilter, DbNotificationSyncState, DbNotificationTabState,
     DbNotificationWindow, NotificationRepository, UNDATED_BEFORE,
 };
-use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
+use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 use wp_mobile_cache::{DbTable, RowId, SqliteDbError, UpdateHook, WpApiCache};
+
+use crate::service::reader::{ReaderError, ReaderService};
 
 /// How many of the newest notes a sync checks, and how many notes an older page has.
 const PAGE_SIZE: u32 = 100;
@@ -56,13 +59,15 @@ const MAX_PAGE_SIZE: u32 = 200;
 /// How many notes are downloaded whole in one request.
 const DOWNLOAD_AT_A_TIME: usize = 100;
 
-/// The tables the cached notes and their state are read from.
-const NOTIFICATION_TABLES: [DbTable; 5] = [
+/// The tables the cached notes and their state are read from. The Reader's waiting likes and
+/// follows show on the notes.
+const NOTIFICATION_TABLES: [DbTable; 6] = [
     DbTable::Notifications,
     DbTable::NotificationListedOnly,
     DbTable::NotificationSyncState,
     DbTable::NotificationTabState,
     DbTable::NotificationReadChanges,
+    DbTable::ReaderActions,
 ];
 
 #[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
@@ -84,6 +89,31 @@ pub enum NotificationServiceError {
     /// has.
     #[error("The server answered without making the change.")]
     ChangeNotMade,
+
+    /// The Reader service the notifications service was made with is the signed-out reader's.
+    /// Notifications belong to an account.
+    #[error(
+        "The notifications service needs an account's Reader service, not the signed-out reader's."
+    )]
+    ReaderSignedOut,
+
+    /// The note isn't in the cache, so what it's about isn't known. Nothing was sent.
+    #[error("Notification {note_id} isn't in the cache.")]
+    NoteNotCached { note_id: NotificationId },
+
+    /// The note doesn't offer `change`: it has no such action, or not the IDs it needs. Nothing
+    /// was sent.
+    #[error("The notification doesn't offer this change: {change:?}.")]
+    ActionNotOffered { change: NotificationNoteChange },
+
+    /// The server refused `change` for good. Every note shows the server's state again.
+    /// `error` is why. [`notification_service_error_user_message`] has a message to show the
+    /// user.
+    #[error("The server refused a change made from a notification ({change:?}): {error}")]
+    ActionRefused {
+        change: NotificationNoteChange,
+        error: ReaderError,
+    },
 }
 
 impl From<WpApiError> for NotificationServiceError {
@@ -178,6 +208,10 @@ pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 /// change the cache at once, then send the change. One that can't be sent yet is kept, and sent by
 /// [`Self::send_pending_changes`] or the next change. Syncs send only GET requests.
 ///
+/// [`Self::set_post_liked`], [`Self::set_comment_liked`] and [`Self::set_site_followed`] go through
+/// the account's [`ReaderService`], the one the service is made with, so they're one queue with
+/// the Reader's likes and follows: [`ReaderService::sync_actions`] sends the ones that wait.
+///
 /// Which notes the API sends can depend on the request's `User-Agent`, which the delegate's
 /// request executor sets, not this service.
 ///
@@ -185,6 +219,8 @@ pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 #[derive(uniffi::Object)]
 pub struct NotificationService {
     client: WpComApiClient,
+    /// The account's Reader, whose action queue likes and follows go through.
+    reader: Arc<ReaderService>,
     /// The client changes are sent with. It sends the service's language in the address, as
     /// every other request does in its query.
     write_client: WpComApiClient,
@@ -205,14 +241,16 @@ pub struct NotificationService {
 
 #[uniffi::export]
 impl NotificationService {
-    /// Uses what the cache has for the account. `cache` must have had its migrations run.
+    /// Uses what the cache has for `reader`'s account, in `reader`'s cache, which must have had
+    /// its migrations run. Pass the app's one Reader service for the account: an app that shows
+    /// no Reader still makes one, as the queue for likes and follows. Fails with
+    /// [`NotificationServiceError::ReaderSignedOut`] for the signed-out reader's.
     #[uniffi::constructor]
     pub fn new(
         delegate: WpApiClientDelegate,
-        cache: Arc<WpApiCache>,
-        user_id: WpComUserId,
+        reader: Arc<ReaderService>,
     ) -> Result<Self, NotificationServiceError> {
-        Self::with_clock(delegate, cache, user_id, Arc::new(SystemTime::now))
+        Self::with_clock(delegate, reader, Arc::new(SystemTime::now))
     }
 
     /// The account the notifications belong to.
@@ -356,6 +394,8 @@ impl NotificationService {
         note_id: NotificationId,
     ) -> Result<NotificationRefreshResult, NotificationServiceError> {
         let _lane = self.lane.lock().await;
+        // See `download`.
+        let _actions = self.reader.hold_action_lane().await;
         let page = self.fetch_whole(&[note_id]).await?;
         Ok(self.cache.execute(|connection| {
             if let Some(note) = page.notes.iter().find(|note| note.note.id == note_id) {
@@ -416,30 +456,36 @@ impl NotificationService {
 
     /// The cached notes that pass `filter`, newest first, each read from the JSON it came as. A
     /// note with no date is last. Doesn't touch the network.
+    ///
+    /// A note shows as the user last left it, sent or not: read or unread, and its post, comment
+    /// or site liked or followed, from a note or in the Reader.
     pub fn load_notes(
         &self,
         filter: NotificationsFilter,
     ) -> Result<Vec<WpComNotification>, NotificationServiceError> {
-        let rows = self.cache.execute(|connection| {
-            NotificationRepository::select(&*connection, self.account, &filter.into())
+        let (rows, waiting) = self.cache.execute(|connection| {
+            Ok::<_, SqliteDbError>((
+                NotificationRepository::select(&*connection, self.account, &filter.into())?,
+                crate::service::reader::waiting_note_actions(&*connection, self.account)?,
+            ))
         })?;
+        // A like or follow waiting to be sent shows over the note's own state.
+        let waiting = note_actions::WaitingNoteActions(waiting);
         Ok(rows
             .into_iter()
-            .filter_map(
-                |row| match serde_json::from_str::<WpComNotification>(&row.json) {
-                    // A note shows as the user last marked it, sent or not.
-                    Ok(note) => Some(WpComNotification {
-                        read: row.read,
-                        ..note
-                    }),
-                    // Every stored note was read before it was stored, so only a change in how
-                    // notes are read can make one unreadable.
-                    Err(error) => {
-                        log::error!("A cached notification couldn't be read: {error}");
-                        None
-                    }
-                },
-            )
+            .filter_map(|row| match waiting.read(&row.json) {
+                // A note shows as the user last marked it, sent or not.
+                Ok(note) => Some(WpComNotification {
+                    read: row.read,
+                    ..note
+                }),
+                // Every stored note was read before it was stored, so only a change in how
+                // notes are read can make one unreadable.
+                Err(error) => {
+                    log::error!("A cached notification couldn't be read: {error}");
+                    None
+                }
+            })
             .collect())
     }
 
@@ -474,13 +520,14 @@ impl NotificationService {
 impl NotificationService {
     pub(crate) fn with_clock(
         delegate: WpApiClientDelegate,
-        cache: Arc<WpApiCache>,
-        user_id: WpComUserId,
+        reader: Arc<ReaderService>,
         clock: Clock,
     ) -> Result<Self, NotificationServiceError> {
-        let account = cache.execute(|connection| {
-            WordPressComAccountRepository::get_or_create(connection, user_id)
-        })?;
+        let ReaderOwner::Account { user_id } = reader.owner() else {
+            return Err(NotificationServiceError::ReaderSignedOut);
+        };
+        let cache = reader.cache();
+        let account = reader.owner_row();
         let language = Arc::new(Mutex::default());
         Ok(Self {
             // The service sends its own language: see `set_language`.
@@ -492,6 +539,7 @@ impl NotificationService {
                 language_provider: Some(Arc::new(changes::ServiceLanguage(language.clone()))),
                 ..delegate
             }),
+            reader,
             cache,
             user_id,
             account,
@@ -696,6 +744,9 @@ impl NotificationService {
         ids: &[NotificationId],
         listed_hashes: Option<&HashMap<NotificationId, Option<u64>>>,
     ) -> Result<(u64, u64), NotificationServiceError> {
+        // No like or follow is sent from fetching the notes to storing them: one the server took
+        // meanwhile would be stored on the notes, and then the older copy stored over it.
+        let _actions = self.reader.hold_action_lane().await;
         let page = self.fetch_whole(ids).await?;
         let requested: HashSet<NotificationId> = ids.iter().copied().collect();
         Ok(self.cache.execute(|connection| {
@@ -863,6 +914,10 @@ fn date(seconds: i64) -> Option<WpGmtDateTime> {
 
 mod changes;
 pub use changes::NotificationChangeOutcome;
+
+mod note_actions;
+pub(crate) use note_actions::{NoteActionTarget, store_note_action};
+pub use note_actions::{NotificationNoteChange, notification_service_error_user_message};
 
 #[cfg(test)]
 mod tests;

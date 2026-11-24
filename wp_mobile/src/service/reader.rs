@@ -30,6 +30,7 @@ mod sites;
 mod stream;
 mod tags;
 
+pub(crate) use actions::waiting_note_actions;
 pub use actions::{
     ReaderActionOutcome, ReaderFollowTarget, ReaderRefusedTag, ReaderTagAdoptionReport,
 };
@@ -331,6 +332,16 @@ impl ReaderService {
 }
 
 impl ReaderService {
+    /// The cache the reader's data is kept in.
+    pub(crate) fn cache(&self) -> Arc<WpApiCache> {
+        self.context.cache.clone()
+    }
+
+    /// The reader's row in the cache.
+    pub(crate) fn owner_row(&self) -> RowId {
+        self.context.owner_row
+    }
+
     pub(crate) fn with_clock(
         delegate: WpApiClientDelegate,
         cache: Arc<WpApiCache>,

@@ -700,6 +700,7 @@ public typealias WpComUnseenNotes = WordPressAPIInternal.WpComUnseenNotes
 
 // MARK: Notification Service
 public typealias NotificationChangeOutcome = WordPressAPIInternal.NotificationChangeOutcome
+public typealias NotificationNoteChange = WordPressAPIInternal.NotificationNoteChange
 public typealias NotificationRefreshResult = WordPressAPIInternal.NotificationRefreshResult
 public typealias NotificationService = WordPressAPIInternal.NotificationService
 public typealias NotificationServiceError = WordPressAPIInternal.NotificationServiceError

@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import rs.wordpress.cache.kotlin.WordPressApiCache
 import uniffi.wp_api.NotificationTab
+import uniffi.wp_api.ReaderSavedSource
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpNetworkHeaderMap
@@ -11,9 +12,15 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.localizedDescription
 import uniffi.wp_mobile.NotificationChangeOutcome
+import uniffi.wp_mobile.NotificationNoteChange
+import uniffi.wp_mobile.NotificationServiceException
 import uniffi.wp_mobile.NotificationsFilter
+import uniffi.wp_mobile.ReaderException
+import uniffi.wp_mobile.notificationServiceErrorUserMessage
+import uniffi.wp_mobile_cache.ReaderOwner
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -47,6 +54,11 @@ class NotificationServiceTest {
 
     private val client = WpComApiClient(WpAuthenticationProvider.none(), executor)
 
+    /** The notifications service for account 1, made with its Reader service as an app makes it. */
+    private fun WpComApiClient.makeService(cache: WordPressApiCache) = makeNotificationService(
+        makeReaderService(cache, ReaderOwner.Account(1uL), ReaderSavedSource.ANDROID)
+    )
+
     private fun isPost(request: WpNetworkRequest, path: String) =
         request.method() == RequestMethod.POST && request.url().contains("/rest/v1.1$path?")
 
@@ -66,7 +78,7 @@ class NotificationServiceTest {
     fun notesAreMarkedReadUnreadAndSeen() = runTest {
         val cache = WordPressApiCache()
         cache.performMigrations()
-        val service = WpComApiClient(WpAuthenticationProvider.none(), writes).makeNotificationService(cache, 1uL)
+        val service = WpComApiClient(WpAuthenticationProvider.none(), writes).makeService(cache)
         service.sync()
 
         assertEquals(NotificationChangeOutcome.SENT, service.markRead(listOf(10_000_000_002uL)))
@@ -88,7 +100,7 @@ class NotificationServiceTest {
     fun aSyncStoresTheNewestNotesAndANewHashDownloadsAgain() = runTest {
         val cache = WordPressApiCache()
         cache.performMigrations()
-        val service = client.makeNotificationService(cache, 1uL)
+        val service = client.makeService(cache)
 
         val first = service.sync()
         assertEquals(2uL, first.downloadedCount)
@@ -108,7 +120,7 @@ class NotificationServiceTest {
     fun eachTabShowsItsOwnNotesAndANoteCanBeRemoved() = runTest {
         val cache = WordPressApiCache()
         cache.performMigrations()
-        val service = client.makeNotificationService(cache, 1uL)
+        val service = client.makeService(cache)
         service.sync()
 
         assertEquals(listOf(10_000_000_002uL), service.loadTabNotes(NotificationTab.UNREAD).map { it.id })
@@ -121,5 +133,29 @@ class NotificationServiceTest {
         // Removing a note sends no request.
         assertTrue(service.removeNote(10_000_000_002uL))
         assertTrue(service.loadTabNotes(NotificationTab.UNREAD).isEmpty())
+    }
+
+    @Test
+    fun aNoteThatIsNotCachedCannotBeLikedOrFollowed() = runTest {
+        val cache = WordPressApiCache()
+        cache.performMigrations()
+        val service = client.makeService(cache)
+
+        val error = assertFailsWith<NotificationServiceException.NoteNotCached> {
+            service.setPostLiked(10_000_000_009uL, true)
+        }
+        assertEquals(10_000_000_009uL, error.noteId)
+        assertFailsWith<NotificationServiceException.NoteNotCached> {
+            service.setCommentLiked(10_000_000_009uL, false)
+        }
+        assertFailsWith<NotificationServiceException.NoteNotCached> {
+            service.setSiteFollowed(10_000_000_009uL, 7001uL, true)
+        }
+        assertEquals(null, notificationServiceErrorUserMessage(error, null))
+        val refused = NotificationServiceException.ActionRefused(
+            NotificationNoteChange.LIKE_COMMENT,
+            ReaderException.MissingIds()
+        )
+        assertEquals("Your like was not added to this comment.", notificationServiceErrorUserMessage(refused, null))
     }
 }

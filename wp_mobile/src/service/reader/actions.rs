@@ -16,6 +16,7 @@
 
 use super::page_views::{ReaderPageViewChoice, ReaderPostLikeResult, ReaderPostLikedOutcome};
 use super::{ReaderContext, ReaderError, ReaderService};
+use crate::service::notifications::NoteActionTarget;
 use futures::lock::Mutex as AsyncMutex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -297,6 +298,28 @@ impl Action {
                 site_id,
                 comment_id,
             } => Some(format!("comment:{}:{}", site_id.0, comment_id.0)),
+        }
+    }
+
+    /// What the action is about when a notification can show it: a like of a site's post or of a
+    /// comment, or a follow of a site by its ID.
+    fn note_target(&self) -> Option<NoteActionTarget> {
+        match self {
+            Self::LikePost { post } => post
+                .site_post()
+                .map(|(site_id, post_id)| NoteActionTarget::Post { site_id, post_id }),
+            Self::LikeComment {
+                site_id,
+                comment_id,
+            } => Some(NoteActionTarget::Comment {
+                site_id: *site_id,
+                comment_id: *comment_id,
+            }),
+            Self::Follow {
+                site_id: Some(site_id),
+                ..
+            } => Some(NoteActionTarget::Site { site_id: *site_id }),
+            _ => None,
         }
     }
 
@@ -953,6 +976,21 @@ pub(crate) fn show_pending(
     Ok(())
 }
 
+/// The likes and follows waiting to be sent that a notification can show, with what the user wants
+/// each to be.
+pub(crate) fn waiting_note_actions(
+    executor: &impl QueryExecutor,
+    owner: RowId,
+) -> Result<Vec<(NoteActionTarget, bool)>, SqliteDbError> {
+    Ok(ReaderActionRepository::select_all(executor, owner)?
+        .into_iter()
+        .filter_map(|row| {
+            let action = serde_json::from_str::<Action>(&row.payload).ok()?;
+            Some((action.note_target()?, row.wanted))
+        })
+        .collect())
+}
+
 /// Whether the tags a follow or unfollow answered with have the tag `id`, `slug`. `None` when a
 /// tag the answer couldn't read could be it.
 fn tag_listed(
@@ -1245,6 +1283,16 @@ impl ReaderContext {
         let finished = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             let finished = ReaderActionRepository::finish(&transaction, row.row_id, row.seq)?;
+            // The server has what was sent, so the account's notifications about the same post,
+            // comment or site keep it once the row goes. A newer tap still waiting shows over it.
+            if let (Ok(_), Some(target)) = (&answer, action.note_target()) {
+                crate::service::notifications::store_note_action(
+                    &transaction,
+                    self.owner_row,
+                    &target,
+                    row.wanted,
+                )?;
+            }
             match (&answer, finished) {
                 // Taken, with no tap since: the row is done, and what the server said is kept.
                 (Ok(confirmation), true) => {
@@ -1937,6 +1985,50 @@ impl ReaderService {
 }
 
 impl ReaderService {
+    /// Likes or follows `target` for a notification, as a tap in the Reader does: it shows on
+    /// what the Reader caches of it, and goes in this service's queue. A follow is sent by `url`
+    /// when there is one, and lists `name` until the server answers. Likes count no page view.
+    pub(crate) async fn set_note_action(
+        &self,
+        target: NoteActionTarget,
+        url: Option<String>,
+        name: Option<String>,
+        on: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        let action = match target {
+            NoteActionTarget::Post { site_id, post_id } => Action::LikePost {
+                post: ReaderPostSaveIdentity {
+                    id: u64::try_from(post_id.0).map_err(|_| ReaderError::MissingIds)?,
+                    site_id: Some(site_id),
+                    feed_id: None,
+                    feed_item_id: None,
+                    is_external: false,
+                    url: None,
+                },
+            },
+            NoteActionTarget::Comment {
+                site_id,
+                comment_id,
+            } => Action::LikeComment {
+                site_id,
+                comment_id,
+            },
+            NoteActionTarget::Site { site_id } => Action::Follow {
+                site_id: Some(site_id),
+                feed_id: None,
+                url: url.filter(|url| !url.is_empty()),
+                name,
+            },
+        };
+        self.context.set_action(action, on).await
+    }
+
+    /// Waits until no change of this service's is being sent, and keeps any from being sent
+    /// until the guard is dropped.
+    pub(crate) async fn hold_action_lane(&self) -> futures::lock::MutexGuard<'_, ()> {
+        self.context.actions.lane.lock().await
+    }
+
     async fn set_delivery(
         &self,
         site_id: WpComSiteId,
