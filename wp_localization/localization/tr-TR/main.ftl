@@ -1,7 +1,5 @@
 parse_api_root_failure_reason_server_fatal_error = Sunucunuz kurtarılamaz bir hatayla karşılaştı ve isteği işleyemedi. Lütfen sunucu hata günlüklerinizi kontrol edin.
 
-parse_api_root = Sitenin WordPress REST API kök yanıtı ayrıştırılamadı.
-
 application_passwords_not_supported = Site Uygulama Şifrelerini desteklemiyor.
 
 application_passwords_disabled_for_http_site = Bu site için Uygulama Şifreleri etkin değil – bunun nedeni muhtemelen güvenli bir bağlantı kuramamamız. Lütfen bu siteye bir SSL sertifikası ekleyin ve tekrar deneyin.
@@ -53,10 +51,6 @@ http_server_error = Sunucuya bağlanılamıyor: { $reason }. Lütfen sunucu sağ
 http_authentication_rejected_error = { $url } adresindeki sunucu giriş bilgilerinizi reddetti. Lütfen geçerli bir kullanıcı adı ve şifre girin.
 
 http_authentication_required_error = { $url } adresindeki sunucu kimlik doğrulaması gerektiriyor. Lütfen kullanıcı adınızı ve şifrenizi girin.
-
-non_existent_site_error = Belirtilen bilgisayar adına sahip bir sunucu bulunamadı.
-
-invalid_ssl_error_certificate_not_valid_for_name = Geçersiz SSL sertifikası
 
 just = { $message }
 
