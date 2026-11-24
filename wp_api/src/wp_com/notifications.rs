@@ -1,4 +1,5 @@
-//! The user's WordPress.com notifications: listing them and fetching one.
+//! The user's WordPress.com notifications: listing them, fetching one, and marking them read,
+//! unread and seen.
 //!
 //! A notification (the API calls it a note) is made of text blocks: a subject, an optional
 //! header, and a body. Each block's ranges and media point into its text, counting positions in
@@ -934,6 +935,63 @@ impl From<RawNotificationIdsResponse> for NotificationIdsResponse {
     }
 }
 
+/// A page of whole notes, each with its JSON as the API sent it, for a cache that keeps notes to
+/// read again later. Keeping the JSON lets a later version of the library read fields this one
+/// doesn't model from notes already stored.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawNotificationsWithJsonResponse")]
+pub struct NotificationsWithJsonResponse {
+    /// The notes, newest first, without any in [`Self::unreadable_notes`].
+    pub notes: Vec<NotificationWithJson>,
+    /// The notes on the page that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_notes: Vec<UnreadableNotification>,
+    /// When the user last looked at their notifications.
+    #[uniffi(default = None)]
+    pub last_seen_time: Option<WpGmtDateTime>,
+}
+
+/// A note, and the JSON it was read from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct NotificationWithJson {
+    pub note: WpComNotification,
+    /// The note's JSON object, as the API sent it.
+    pub json: String,
+}
+
+impl<'de> Deserialize<'de> for NotificationWithJson {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let json = Box::<serde_json::value::RawValue>::deserialize(deserializer)?;
+        let note = serde_json::from_str(json.get()).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            note,
+            json: json.get().to_string(),
+        })
+    }
+}
+
+#[derive(Deserialize)]
+struct RawNotificationsWithJsonResponse {
+    #[serde(default)]
+    notes: Option<LenientVec<NotificationWithJson>>,
+    #[serde(default, deserialize_with = "lenient::date")]
+    last_seen_time: Option<WpGmtDateTime>,
+}
+
+impl From<RawNotificationsWithJsonResponse> for NotificationsWithJsonResponse {
+    fn from(raw: RawNotificationsWithJsonResponse) -> Self {
+        let (notes, unreadable_notes) = sort_notes(raw.notes);
+        Self {
+            notes,
+            unreadable_notes,
+            last_seen_time: raw.last_seen_time,
+        }
+    }
+}
+
 /// A note on a page that couldn't be read. It doesn't fail the page: the page keeps the notes
 /// it can read, and lists the others as these.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
@@ -1553,6 +1611,17 @@ pub use layout::{
     NotificationReactionsLayout, NotificationSiteCard, notification_layout,
 };
 
+mod tab;
+pub use tab::NotificationTab;
+
+mod writes;
+pub use writes::{
+    NOTIFICATION_READ_COUNT, NOTIFICATION_UNREAD_COUNT, NotificationReadChange,
+    NotificationsReadAllParams, NotificationsReadAllResponse, NotificationsReadParams,
+    NotificationsReadResponse, NotificationsSeenParams, NotificationsSeenResponse,
+    WpComUnseenNotes,
+};
+
 #[cfg(test)]
 mod corpus;
 
@@ -1875,6 +1944,34 @@ mod tests {
                 .iter()
                 .all(|note| !note.error.is_empty())
         );
+    }
+
+    /// Each note keeps its JSON exactly as it came, fields the model doesn't know included, and a
+    /// note that can't be read is listed as unreadable, as on a page without JSON.
+    #[test]
+    fn test_deserialize_notes_with_json() {
+        let note_json = r#"{"id":10000000002,"type":"like","read":1,"a_later_field":{"x":[1,2]}}"#;
+        let page: NotificationsWithJsonResponse = serde_json::from_str(&format!(
+            r#"{{"last_seen_time":"1767312000","notes":[{note_json},{{"id":"not a number","type":"example_type"}}]}}"#
+        ))
+        .unwrap();
+
+        let [kept] = &page.notes[..] else {
+            panic!("Expected one note");
+        };
+        assert_eq!(kept.json, note_json);
+        assert_eq!(kept.note.id, NotificationId(10_000_000_002));
+        assert_eq!(kept.note.read, Some(true));
+        assert_eq!(
+            serde_json::from_str::<WpComNotification>(&kept.json).unwrap(),
+            kept.note
+        );
+        assert_eq!(page.unreadable_notes.len(), 1);
+        assert_eq!(
+            page.unreadable_notes[0].note_type.as_deref(),
+            Some("example_type")
+        );
+        assert_eq!(page.last_seen_time, date("2026-01-02T00:00:00Z"));
     }
 
     /// A note with only an ID is what `fields=id` sends, and it's still a note.

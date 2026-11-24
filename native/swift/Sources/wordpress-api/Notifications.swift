@@ -34,3 +34,15 @@ extension NotificationLabel {
         localizeNotificationLabel(value: self, locale: wpLocaleResolve(langIds: languages))
     }
 }
+
+extension NotificationTab {
+    /// The tab's name in the user's preferred language, or in English until it's translated.
+    public var localizedText: String {
+        localizedText(languages: Locale.preferredLanguages)
+    }
+
+    /// The tab's name in the first of `languages` that has translations, or in English.
+    public func localizedText(languages: [String]) -> String {
+        localizeNotificationTab(value: self, locale: wpLocaleResolve(langIds: languages))
+    }
+}

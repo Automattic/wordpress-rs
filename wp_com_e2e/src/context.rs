@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use integration_test_credentials::WpComTestCredentials;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -49,6 +50,10 @@ pub struct AccountLocks {
     /// subscription too: turning them on subscribes the account to the post's comments, and
     /// turning them off unsubscribes it.
     pub own_post: Mutex<()>,
+    /// The hashes of the account's notifications. Any request for whole notes gives the notes it
+    /// sends new hashes, so the trials that sync notes by comparing hashes hold it for writing,
+    /// and every other trial that asks for whole notes holds it for reading.
+    pub notification_hashes: RwLock<()>,
 }
 
 /// Holds account state for a trial that changes it. A trial that failed by panicking leaves the
@@ -168,5 +173,38 @@ impl TestContext {
             runtime,
             locks: AccountLocks::default(),
         }
+    }
+}
+
+/// A request executor that counts the requests it sends.
+pub struct CountingExecutor {
+    pub inner: Arc<dyn RequestExecutor>,
+    pub sent: AtomicU64,
+}
+
+#[async_trait]
+impl RequestExecutor for CountingExecutor {
+    async fn execute(
+        &self,
+        request: Arc<WpNetworkRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        self.sent.fetch_add(1, Ordering::SeqCst);
+        self.inner.execute(request).await
+    }
+
+    async fn upload(
+        &self,
+        request: Arc<wp_api::request::WpMultipartFormRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        self.sent.fetch_add(1, Ordering::SeqCst);
+        self.inner.upload(request).await
+    }
+
+    async fn sleep(&self, millis: u64) {
+        self.inner.sleep(millis).await
+    }
+
+    fn cancel(&self, context: Arc<wp_api::request::RequestContext>) {
+        self.inner.cancel(context)
     }
 }

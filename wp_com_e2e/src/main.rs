@@ -9,6 +9,8 @@ mod domains_tests;
 mod languages_tests;
 mod me_tests;
 mod notification_checks;
+mod notification_service_tests;
+mod notification_write_tests;
 mod notifications_tests;
 mod products_tests;
 mod purchases_tests;
@@ -43,6 +45,11 @@ mod support_eligibility_test;
 mod support_tickets_test;
 mod transactions_tests;
 mod unified_conversations_tests;
+// The paging rule `notifications_sweep` walks by, which a notification service trial walks by
+// too, to compare with what the service cached.
+#[path = "bin/notifications_sweep/walk.rs"]
+#[allow(dead_code)]
+mod walk;
 mod wp_service_tests;
 
 use context::TestContext;
@@ -73,6 +80,8 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(languages_tests::tests(Arc::clone(&ctx)));
     tests.extend(me_tests::tests(Arc::clone(&ctx)));
     tests.extend(notifications_tests::tests(Arc::clone(&ctx)));
+    tests.extend(notification_service_tests::tests(Arc::clone(&ctx)));
+    tests.extend(notification_write_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_actions_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_post_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_comments_tests::tests(Arc::clone(&ctx)));

@@ -33,7 +33,8 @@ use wp_mobile_cache::repository::reader_comments::ReaderCommentSendState;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 
 use crate::context::{
-    TestContext, alone, changing, changing_alone, making_a_change, read_back, reading,
+    CountingExecutor, TestContext, alone, changing, changing_alone, making_a_change, read_back,
+    reading,
 };
 
 /// The WordPress.com Blog, which is public and has years of posts.
@@ -1101,7 +1102,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
 /// The account whose token the trials use. Each trial's cache is new, so any user ID keeps them
 /// apart.
-fn account() -> ReaderOwner {
+pub(crate) fn account() -> ReaderOwner {
     ReaderOwner::Account {
         user_id: WpComUserId(1),
     }
@@ -1184,7 +1185,7 @@ async fn views_of(ctx: &TestContext, site_id: WpComSiteId, post_id: PostId) -> R
 }
 
 /// The newest post of a site, as the cache has it after a refresh of the site's stream.
-async fn first_post_of(
+pub(crate) async fn first_post_of(
     service: &ReaderService,
     site_id: WpComSiteId,
 ) -> Result<ReaderPostRecord, Failed> {
@@ -1212,7 +1213,7 @@ fn own_site_client(ctx: &TestContext, site_id: WpComSiteId) -> WpApiClient {
 
 /// Whether the server has the account's like on a post, asked of the post's likes directly:
 /// nothing of the service or its cache is in the answer.
-async fn server_says_post_liked(
+pub(crate) async fn server_says_post_liked(
     ctx: &TestContext,
     post: &ReaderPostRecord,
 ) -> Result<bool, Failed> {
@@ -1235,7 +1236,7 @@ async fn server_says_post_liked(
 
 /// Likes or unlikes a post through the service, and checks that the server has it and the cache
 /// shows it.
-async fn like_and_check(
+pub(crate) async fn like_and_check(
     ctx: &TestContext,
     service: &ReaderService,
     post: &ReaderPostRecord,
@@ -2014,41 +2015,11 @@ async fn download_saved_posts(
     Ok(())
 }
 
-/// A request executor that counts the requests it sends.
-struct CountingExecutor {
-    inner: Arc<dyn RequestExecutor>,
-    sent: AtomicU64,
-}
-
-#[async_trait::async_trait]
-impl RequestExecutor for CountingExecutor {
-    async fn execute(
-        &self,
-        request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.sent.fetch_add(1, Ordering::SeqCst);
-        self.inner.execute(request).await
-    }
-
-    async fn upload(
-        &self,
-        request: Arc<wp_api::request::WpMultipartFormRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.sent.fetch_add(1, Ordering::SeqCst);
-        self.inner.upload(request).await
-    }
-
-    async fn sleep(&self, millis: u64) {
-        self.inner.sleep(millis).await
-    }
-
-    fn cancel(&self, context: Arc<wp_api::request::RequestContext>) {
-        self.inner.cancel(context)
-    }
-}
-
 /// A service with a new, empty cache.
-fn new_service(delegate: WpApiClientDelegate, owner: ReaderOwner) -> Result<ReaderService, Failed> {
+pub(crate) fn new_service(
+    delegate: WpApiClientDelegate,
+    owner: ReaderOwner,
+) -> Result<ReaderService, Failed> {
     let cache = WpApiCache::new(None).map_err(|e| e.to_string())?;
     cache.perform_migrations().map_err(|e| e.to_string())?;
     Ok(

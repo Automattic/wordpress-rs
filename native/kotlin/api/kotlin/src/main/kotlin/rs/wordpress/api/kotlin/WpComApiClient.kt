@@ -14,6 +14,7 @@ import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAppNotifier
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpComLanguageProvider
+import uniffi.wp_mobile.NotificationService
 import uniffi.wp_mobile.ReaderService
 import uniffi.wp_mobile_cache.ReaderOwner
 
@@ -83,6 +84,18 @@ class WpComApiClient(
         owner: ReaderOwner,
         savedSource: ReaderSavedSource
     ): ReaderService = ReaderService(delegate, cache.cache, owner, savedSource)
+
+    /**
+     * Creates the notifications service for one account. It keeps the account's notes in [cache],
+     * syncs the newest by comparing hashes, and loads older ones a page at a time. Every request
+     * it sends is a GET.
+     *
+     * The cache's migrations must have run. Create one per account and share it.
+     */
+    fun makeNotificationService(
+        cache: WordPressApiCache,
+        userId: ULong
+    ): NotificationService = NotificationService(delegate, cache.cache, userId)
 
     // Provides the _only_ way to execute authenticated requests using our Kotlin wrapper.
     //
