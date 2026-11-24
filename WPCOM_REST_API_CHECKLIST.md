@@ -143,8 +143,9 @@ investigate the relevant code before making decisions based on this document.
 
 - [x] `GET /rest/v1.1/notifications` — list notifications
 - [x] `GET /rest/v1.1/notifications/$note_id` — fetch single notification
-- [ ] `POST /rest/v1.1/notifications/read` — mark notification as read
-- [ ] `POST /rest/v1.1/notifications/seen` — mark notifications as seen
+- [x] `POST /rest/v1.1/notifications/read` — mark notifications read or unread
+- [x] `POST /rest/v1.1/notifications/read/all` — mark every notification at or before a time read
+- [x] `POST /rest/v1.1/notifications/seen` — mark notifications as seen
 - [ ] `GET /rest/v1.1/me/notifications/settings/` — get notification settings
 - [ ] `POST /rest/v1.1/me/notifications/settings/` — save notification settings
 - [ ] `POST /rest/v1/devices/$device_id/delete` — unregister device

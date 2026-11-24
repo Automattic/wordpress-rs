@@ -5,7 +5,9 @@ use crate::{
         notifications::{
             NOTE_HASH_FIELDS, NOTE_ID_FIELDS, NotificationHashesResponse, NotificationId,
             NotificationIdsResponse, NotificationParams, NotificationsParams, NotificationsQuery,
-            NotificationsResponse, NotificationsWithJsonResponse,
+            NotificationsReadAllParams, NotificationsReadAllResponse, NotificationsReadParams,
+            NotificationsReadResponse, NotificationsResponse, NotificationsSeenParams,
+            NotificationsSeenResponse, NotificationsWithJsonResponse,
         },
     },
 };
@@ -28,6 +30,16 @@ enum NotificationsRequest {
     // One note. One that doesn't exist is a success with no notes, not a 404.
     #[get(url = "/notifications/<notification_id>", params = &NotificationParams, output = NotificationsResponse)]
     Get,
+    // Marks notes read or unread. Every parameter is in the body.
+    #[post(url = "/notifications/read", params = &NotificationsReadParams, output = NotificationsReadResponse)]
+    MarkRead,
+    // Marks every note at or before a time read. The API refuses a body parameter other than
+    // `time` and `source`, and a `time` in the address.
+    #[post(url = "/notifications/read/all", params = &NotificationsReadAllParams, output = NotificationsReadAllResponse)]
+    MarkAllRead,
+    // Records the time of the newest note the user has seen, which clears the unseen flag.
+    #[post(url = "/notifications/seen", params = &NotificationsSeenParams, output = NotificationsSeenResponse)]
+    MarkSeen,
 }
 
 impl DerivedRequest for NotificationsRequest {
@@ -39,7 +51,10 @@ impl DerivedRequest for NotificationsRequest {
             NotificationsRequest::ListIds => vec![("fields", NOTE_ID_FIELDS.to_string())],
             NotificationsRequest::List
             | NotificationsRequest::ListWithJson
-            | NotificationsRequest::Get => Vec::new(),
+            | NotificationsRequest::Get
+            | NotificationsRequest::MarkRead
+            | NotificationsRequest::MarkAllRead
+            | NotificationsRequest::MarkSeen => Vec::new(),
         }
     }
 
@@ -178,6 +193,24 @@ mod tests {
             endpoint.get(&NotificationId(10_000_000_001), &params),
             &expected_path,
         );
+    }
+
+    /// Every parameter of a write goes in the body. Only the client's language is in the
+    /// address.
+    #[rstest]
+    fn writes(
+        endpoint: NotificationsRequestEndpoint,
+        fixture_wp_com_api_url_resolver: Arc<dyn ApiUrlResolver>,
+    ) {
+        validate_wp_com_rest_v1_1_endpoint(endpoint.mark_read(), "/notifications/read");
+        validate_wp_com_rest_v1_1_endpoint(endpoint.mark_all_read(), "/notifications/read/all");
+        validate_wp_com_rest_v1_1_endpoint(endpoint.mark_seen(), "/notifications/seen");
+
+        let in_spanish = NotificationsRequestEndpoint::with_language_provider(
+            fixture_wp_com_api_url_resolver,
+            language_provider(Some(WPComLanguage::Spanish)),
+        );
+        validate_wp_com_rest_v1_1_endpoint(in_spanish.mark_read(), "/notifications/read?locale=es");
     }
 
     /// The client's language goes first, so a `locale` in the params, which comes later, is the

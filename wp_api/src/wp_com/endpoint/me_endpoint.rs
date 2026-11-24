@@ -1,5 +1,6 @@
 use crate::wp_com::domains::SupportedCountries;
 use crate::wp_com::me::{DomainContactInformation, WPComUserInfo};
+use crate::wp_com::notifications::WpComUnseenNotes;
 use crate::wp_com::transactions::{RedeemCartParams, TransactionReceipt};
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
@@ -17,9 +18,22 @@ enum MeRequest {
     DomainContactInformation,
     #[post(url = "/me/transactions", params = &RedeemCartParams, output = TransactionReceipt)]
     RedeemCart,
+    // Whether the account has notifications the user hasn't seen: the flag that lights the bell.
+    #[get(url = "/me", output = WpComUnseenNotes)]
+    UnseenNotes,
 }
 
 impl DerivedRequest for MeRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            MeRequest::UnseenNotes => vec![("fields", "has_unseen_notes".to_string())],
+            MeRequest::Get
+            | MeRequest::TransactionsSupportedCountries
+            | MeRequest::DomainContactInformation
+            | MeRequest::RedeemCart => Vec::new(),
+        }
+    }
+
     fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::RestV1_1
     }
@@ -61,6 +75,11 @@ mod tests {
             endpoint.domain_contact_information(),
             "/me/domain-contact-information",
         );
+    }
+
+    #[rstest]
+    fn unseen_notes(endpoint: MeRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(endpoint.unseen_notes(), "/me?fields=has_unseen_notes");
     }
 
     #[rstest]

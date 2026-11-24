@@ -1,4 +1,5 @@
-//! The user's WordPress.com notifications: listing them and fetching one.
+//! The user's WordPress.com notifications: listing them, fetching one, and marking them read,
+//! unread and seen.
 //!
 //! A notification (the API calls it a note) is made of text blocks: a subject, an optional
 //! header, and a body. Each block's ranges and media point into its text, counting positions in
@@ -1612,6 +1613,14 @@ pub use layout::{
 
 mod tab;
 pub use tab::NotificationTab;
+
+mod writes;
+pub use writes::{
+    NOTIFICATION_READ_COUNT, NOTIFICATION_UNREAD_COUNT, NotificationReadChange,
+    NotificationsReadAllParams, NotificationsReadAllResponse, NotificationsReadParams,
+    NotificationsReadResponse, NotificationsSeenParams, NotificationsSeenResponse,
+    WpComUnseenNotes,
+};
 
 #[cfg(test)]
 mod corpus;
