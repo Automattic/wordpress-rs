@@ -24,6 +24,9 @@
 use super::page_views::{ReaderPageViewChoice, ReaderPostLikeResult, ReaderPostLikedOutcome};
 use super::{ReaderContext, ReaderError, ReaderService};
 use crate::service::notifications::NoteActionTarget;
+use crate::service::queued_actions::{
+    QueuedAction, QueuedActionEvent, QueuedActionListeners, QueuedActionState,
+};
 use futures::lock::Mutex as AsyncMutex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -313,6 +316,40 @@ impl Action {
                 site_id,
                 comment_id,
             } => Some(format!("comment:{}:{}", site_id.0, comment_id.0)),
+        }
+    }
+
+    /// The action as a [`QueuedActionEvent`] describes it.
+    fn queued(&self) -> QueuedAction {
+        match self.clone() {
+            Self::Seen { post, .. } => QueuedAction::PostSeen { post },
+            Self::BlockSite { site_id } => QueuedAction::SiteBlock { site_id },
+            Self::LikePost { post } => QueuedAction::PostLike { post },
+            Self::Follow {
+                site_id,
+                feed_id,
+                url,
+                ..
+            } => QueuedAction::Follow {
+                site_id,
+                feed_id,
+                url,
+            },
+            Self::FollowTag { slug, .. } => QueuedAction::TagFollow { slug },
+            Self::LikeComment {
+                site_id,
+                comment_id,
+            } => QueuedAction::CommentLike {
+                site_id,
+                comment_id,
+            },
+            Self::Delivery { site_id, setting } => match setting {
+                DeliverySetting::PostEmails => QueuedAction::PostEmails { site_id },
+                DeliverySetting::CommentEmails => QueuedAction::CommentEmails { site_id },
+                DeliverySetting::Notifications => QueuedAction::PostNotifications { site_id },
+            },
+            Self::SubscribeComments { post } => QueuedAction::CommentsSubscription { post },
+            Self::CommentNotifications { post } => QueuedAction::CommentNotifications { post },
         }
     }
 
@@ -1097,6 +1134,8 @@ pub(crate) struct ActionContext {
     pub(crate) owner_row: RowId,
     /// The account's queue, which every service of the account shares.
     pub(crate) queue: Arc<ActionQueue>,
+    /// Who hears what becomes of the queue's rows: the database's listeners.
+    listeners: Arc<QueuedActionListeners>,
 }
 
 impl ActionContext {
@@ -1114,10 +1153,25 @@ impl ActionContext {
                 ..delegate
             }),
             queue: cache.shared_state(owner_row),
+            listeners: cache.database_shared_state(),
             cache,
             owner,
             owner_row,
         }
+    }
+
+    /// Tells the database's listeners that `action`, turned `on` or off, is now in `state`. Call
+    /// it once the cache has the new state, holding no lock but the lane.
+    fn announce(&self, action: &Action, on: bool, state: QueuedActionState) {
+        let ReaderOwner::Account { user_id } = self.owner else {
+            return;
+        };
+        self.listeners.send(QueuedActionEvent {
+            user_id,
+            action: action.queued(),
+            on,
+            state,
+        });
     }
 
     /// Waits until no change of the account's is being sent, and keeps any from being sent until
@@ -1142,6 +1196,7 @@ impl ActionContext {
             Ok::<_, ReaderError>(target)
         })?;
         let _waiting = self.wait_on(target.clone());
+        self.announce(&action, on, QueuedActionState::Waiting);
 
         let unsent = {
             let _lane = self.queue.lane.lock().await;
@@ -1399,23 +1454,32 @@ impl ActionContext {
                 .expect("confirmed blocks lock poisoned")
                 .insert(*site_id, row.wanted);
         }
-        if let (Err(error), true) = (answer, finished) {
-            let is_waited_on = self
-                .queue
-                .waiting
-                .lock()
-                .expect("waiting lock poisoned")
-                .contains_key(&target);
-            if is_waited_on {
-                self.queue
-                    .refusals
-                    .lock()
-                    .expect("refusals lock poisoned")
-                    .insert(target, error);
-            } else {
-                log::warn!("The server refused a Reader action sent later: {error}");
-            }
+        // A row with a newer tap since sends nothing: the newer tap's answer does.
+        if !finished {
+            return Ok(());
         }
+        let state = match answer {
+            Ok(_) => QueuedActionState::Sent,
+            Err(error) => {
+                let is_waited_on = self
+                    .queue
+                    .waiting
+                    .lock()
+                    .expect("waiting lock poisoned")
+                    .contains_key(&target);
+                if is_waited_on {
+                    self.queue
+                        .refusals
+                        .lock()
+                        .expect("refusals lock poisoned")
+                        .insert(target, error.clone());
+                } else {
+                    log::warn!("The server refused a Reader action sent later: {error}");
+                }
+                QueuedActionState::Refused { error }
+            }
+        };
+        self.announce(action, row.wanted, state);
         Ok(())
     }
 }
@@ -1677,7 +1741,9 @@ impl ReaderService {
 
     /// Sends what the user turned on or off that the server doesn't have yet, such as a post
     /// marked as seen while offline. Returns how many are still waiting. Call it at launch, when
-    /// the app comes to the foreground, and when the device comes back online.
+    /// the app comes to the foreground, and when the device comes back online. A listener added
+    /// with [`add_queued_action_listener`](crate::service::queued_actions::add_queued_action_listener)
+    /// hears whether the server took or refused each.
     pub async fn sync_actions(&self) -> Result<u64, ReaderError> {
         let context = &self.context;
         if context.owner == ReaderOwner::SignedOut {
@@ -1913,14 +1979,15 @@ impl ReaderService {
         if context.owner == ReaderOwner::SignedOut {
             return Ok(ReaderTagAdoptionReport::default());
         }
-        let tags = context.cache.execute(|connection| {
+        let (tags, recorded) = context.cache.execute(|connection| {
             let transaction = connection.transaction().map_err(SqliteDbError::from)?;
             let Some(signed_out) =
                 WordPressComAccountRepository::select_owner(&transaction, ReaderOwner::SignedOut)?
             else {
-                return Ok::<_, ReaderError>(Vec::new());
+                return Ok::<_, ReaderError>((Vec::new(), Vec::new()));
             };
             let mut tags: Vec<(Target, ReaderTagSlug, Option<String>)> = Vec::new();
+            let mut recorded: Vec<Action> = Vec::new();
             for tag in ReaderMenuRepository::select_section(
                 &transaction,
                 signed_out,
@@ -1934,6 +2001,7 @@ impl ReaderService {
                 let target = context.actions.record_action(&transaction, &action, true)?;
                 if !tags.iter().any(|(listed, _, _)| *listed == target) {
                     tags.push((target, slug, tag.title));
+                    recorded.push(action);
                 }
             }
             // They're the account's now.
@@ -1944,12 +2012,17 @@ impl ReaderService {
                 &[],
             )?;
             transaction.commit().map_err(SqliteDbError::from)?;
-            Ok(tags)
+            Ok((tags, recorded))
         })?;
         let _waiting: Vec<_> = tags
             .iter()
             .map(|(target, _, _)| context.actions.wait_on(target.clone()))
             .collect();
+        for action in &recorded {
+            context
+                .actions
+                .announce(action, true, QueuedActionState::Waiting);
+        }
 
         {
             let _lane = context.actions.hold_lane().await;

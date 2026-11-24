@@ -26,7 +26,7 @@ pub trait MaybeWpError {
     fn is_unauthorized_error(&self) -> Option<bool>;
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpApiError {
     InvalidHttpStatusCode {
         status_code: u32,

@@ -59,7 +59,7 @@ Each change shows in the cache at once, and observers hear of it through `is_rel
 | `Unchanged` | Nothing to send: the notes already show that way, or the seen time isn't newer. | No change |
 | An error | The server refused it for good: an answer in the 400s other than 401, 408 or 429, or a success that says it didn't make the change (`ChangeNotMade`). The change is dropped. | The notes as the server has them |
 
-Changes that wait are sent by `send_pending_changes()` and by the next change of any kind. Call it at launch, when the app comes to the foreground, and when the device is back online. It also sends what waits in the account's queue of likes and follows (see the next section), and returns how many of both still wait. `pending_change_count()` counts the read and seen changes only. `pending_action_count()` counts that queue, which also holds what the account's Reader service queued, such as a post marked seen. A change refused when it's sent later is logged, and the notes go back to the server's state.
+Changes that wait are sent by `send_pending_changes()` and by the next change of any kind. Call it at launch, when the app comes to the foreground, and when the device is back online. It also sends what waits in the account's queue of likes and follows (see the next section), and returns how many of both still wait. `pending_change_count()` counts the read and seen changes only. `pending_action_count()` counts that queue, which also holds what the account's Reader service queued, such as a post marked seen. A read or seen change refused when it's sent later is logged, and the notes go back to the server's state. The app hears of a like or follow refused later through an event: see "Hearing what became of a like or follow".
 
 ## Liking and following from a note
 
@@ -75,6 +75,37 @@ Each goes in the account's queue of likes and follows in the cache, the same one
 
 A note that isn't cached fails with `NoteNotCached`, and one that doesn't offer the action with `ActionNotOffered`. Neither sends anything.
 
+## Hearing what became of a like or follow
+
+A like or follow made offline is sent later, when no call is left to fail. If the server then refuses it, the notes go back, and an event is the only way the app hears why. Every change in the account's queue sends a `QueuedActionEvent`, whichever service made it: likes and follows from a note, and everything the Reader queues, such as a post marked seen or a tag followed.
+
+```swift
+let observer = cache.addQueuedActionObserver { event in
+    if case .refused = event.state, let message = event.userMessage {
+        DispatchQueue.main.async { showError(message) }
+    }
+}
+```
+
+In Swift, `WordPressApiCache` also has `queuedActionEventsPublisher()` and `queuedActionEvents()`, and from iOS 26 and macOS 26 a typed message: `NotificationCenter.default.addObserver(of: cache, for: .queuedActionChanged) { message in … }` or `NotificationCenter.default.messages(of: cache, for: .queuedActionChanged)`. Both kinds of observer hear the same notification. In Kotlin, collect `cache.queuedActionEvents`, a `SharedFlow`. In Rust, implement `QueuedActionListener` and pass it to `add_queued_action_listener(cache, listener)`, which returns the ID that `remove_queued_action_listener` takes.
+
+An event has the account's `user_id`, the `action` with the IDs of what it's about, whether the user turned it `on` or off, and its `state`:
+
+| State | When |
+|---|---|
+| `Waiting` | The change is shown and stored, and waits to be sent. |
+| `Sent` | The server took it, and nothing newer waits for the same post, comment, site or tag. |
+| `Refused { error }` | The server refused it for good, or answered with a success that says it didn't do it, and nothing newer waits. What the user sees went back. |
+
+A send that gets no answer sends no event: the change still waits. When the user changes the same thing again while the first change is being sent, only the newer change gets a final event. `queued_action_event_user_message(event, locale)` (Swift: `event.userMessage`) gives the same sentences as `ActionRefused` for a refused like of a post or a comment, or a refused follow, and `nil` for everything else.
+
+What an event doesn't promise:
+
+- **It's in memory only.** An event sent before anyone listens isn't sent again, and a change still waiting from before a restart sends no new `Waiting` event, though its answer sends one.
+- **A listener must not block.** It's called on the thread that made the change, while the account's changes are being sent. Hand the event to the main thread or a queue. A listener may call back into the library, such as `pending_action_count()`.
+- **Every cache object of the file hears it.** Listeners belong to the database file, so a listener added through one `WpApiCache` object hears changes made through another. A database in memory has its own.
+- **Marking notes read or seen sends none.** Those changes wait in the service's own list, and their calls say what became of them.
+
 ## When the app hears of a change
 
 An app with its own push handling or socket passes the note's ID to the service:
@@ -89,7 +120,7 @@ Both change the cache, so `is_relevant_update` says to reload. With no push or s
 - **A sync doesn't undo a change that waits.** Until a change reaches the server, the server still has the old state, and a sync stores it. The cached lists show the waiting change over it. Changes and syncs take turns, so a change is sent after a sync that's running, and the next sync sees the server after it. A sync downloads no note while a like or follow is being sent, so it can't store a copy from before one the server just took.
 - **The seen time only moves forward.** `mark_seen` ignores a time that isn't after the newest the service knows, and a seen time that waits is dropped, unsent, if a sync brings a newer one from another device.
 - **Marking a note gives it a new hash.** The next sync downloads it again, as it does a note another client fetched.
-- **Use one `WpApiCache` object for the database file.** An object only reports the changes made through it, so a list that observes one object doesn't hear of a change a service made through another. The queue of likes and follows is shared either way: every object of one file in the process uses the same one.
+- **Use one `WpApiCache` object for the database file.** An object only reports the changes made through it, so a list that observes one object doesn't hear of a change a service made through another. The queue of likes and follows and its listeners are shared either way: every object of one file in the process uses the same ones.
 - **Send changes from one process.** The queue takes turns in memory. An app extension that opened the same file and sent what waits could send a change the app is sending too.
 - **Set the language once, and keep it.** `set_language` sets the language every request is sent in, changes included, as its WordPress.com locale (`en`, `pt-br`). A request in a different language from the account's previous one changes every note's hash, so the sync after a change downloads every note again. `None` sends English. The delegate's `language_provider` isn't used.
 - **Other clients make the service download notes again.** Fetching a note whole gives it a new hash. So when the web or another app fetches a note between two syncs, the next sync downloads it, though nothing changed. That's expected.

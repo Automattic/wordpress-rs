@@ -14,6 +14,7 @@ pub mod mock_post_service;
 pub mod notifications;
 pub mod post_types;
 pub mod posts;
+pub mod queued_actions;
 pub mod reader;
 pub mod reader_saved;
 pub mod sites;

@@ -2819,4 +2819,463 @@ mod note_actions {
             )]
         );
     }
+
+    /// What the queue tells its listeners. Tags "art" and "travel" and site 7005 are invented.
+    mod queued_action_events {
+        use super::*;
+        use crate::service::queued_actions::{
+            QueuedAction, QueuedActionEvent, QueuedActionListener, QueuedActionState,
+            add_queued_action_listener, queued_action_event_user_message,
+            remove_queued_action_listener,
+        };
+        use wp_api::comments::CommentId;
+        use wp_api::wp_com::reader_posts::ReaderTagSlug;
+
+        /// Keeps every event it hears.
+        #[derive(Default)]
+        struct Recorder {
+            events: Mutex<Vec<QueuedActionEvent>>,
+        }
+
+        impl QueuedActionListener for Recorder {
+            fn queued_action_changed(&self, event: QueuedActionEvent) {
+                self.events.lock().unwrap().push(event);
+            }
+        }
+
+        impl Recorder {
+            fn events(&self) -> Vec<QueuedActionEvent> {
+                self.events.lock().unwrap().clone()
+            }
+
+            /// Each event's action, whether it was turned on, and its state's name.
+            fn heard(&self) -> Vec<(QueuedAction, bool, &'static str)> {
+                self.events()
+                    .into_iter()
+                    .map(|event| (event.action, event.on, state_name(&event.state)))
+                    .collect()
+            }
+        }
+
+        fn state_name(state: &QueuedActionState) -> &'static str {
+            match state {
+                QueuedActionState::Waiting => "waiting",
+                QueuedActionState::Sent => "sent",
+                QueuedActionState::Refused { .. } => "refused",
+            }
+        }
+
+        fn listen(cache: &Arc<WpApiCache>) -> Arc<Recorder> {
+            let recorder = Arc::new(Recorder::default());
+            add_queued_action_listener(cache.clone(), recorder.clone());
+            recorder
+        }
+
+        fn post() -> ReaderPostSaveIdentity {
+            ReaderPostSaveIdentity {
+                id: POST,
+                site_id: Some(WpComSiteId(SITE)),
+                feed_id: None,
+                feed_item_id: None,
+                is_external: false,
+                url: None,
+            }
+        }
+
+        fn post_like() -> QueuedAction {
+            QueuedAction::PostLike { post: post() }
+        }
+
+        fn refused() -> Step {
+            Step::Respond(
+                403,
+                json!({ "error": "unauthorized", "message": "You can't like this post." }),
+            )
+        }
+
+        #[tokio::test]
+        async fn a_like_from_a_note_waits_and_then_is_sent() {
+            let (service, executor) = services();
+            store(&service, &executor, &[new_post(1, false, false)]).await;
+            let recorder = listen(&service.cache);
+            executor.push(like_answer(true));
+
+            service
+                .set_post_liked(NotificationId(id(1)), true)
+                .await
+                .unwrap();
+
+            assert_eq!(
+                recorder.heard(),
+                [(post_like(), true, "waiting"), (post_like(), true, "sent")]
+            );
+            assert!(recorder.events().iter().all(|event| event.user_id == USER));
+        }
+
+        #[tokio::test]
+        async fn a_like_made_offline_only_waits_until_the_other_service_sends_it() {
+            let (service, reader, executor) = services_with_reader();
+            store(&service, &executor, &[new_post(1, false, false)]).await;
+            let recorder = listen(&service.cache);
+            executor.push(Step::Offline);
+            service
+                .set_post_liked(NotificationId(id(1)), true)
+                .await
+                .unwrap();
+            assert_eq!(recorder.heard(), [(post_like(), true, "waiting")]);
+
+            // Still offline: no answer, so nothing more is heard.
+            executor.push(Step::Offline);
+            assert_eq!(reader.sync_actions().await.unwrap(), 1);
+            assert_eq!(recorder.heard().len(), 1);
+
+            executor.push(like_answer(true));
+            assert_eq!(reader.sync_actions().await.unwrap(), 0);
+            assert_eq!(
+                recorder.heard(),
+                [(post_like(), true, "waiting"), (post_like(), true, "sent")]
+            );
+        }
+
+        /// A refusal that no call waits on is told to the listeners and to nobody else.
+        #[tokio::test]
+        async fn a_like_made_offline_and_refused_later_is_heard_with_a_message_for_the_user() {
+            let (service, executor) = services();
+            store(&service, &executor, &[new_post(1, false, false)]).await;
+            let recorder = listen(&service.cache);
+            executor.push(Step::Offline);
+            service
+                .set_post_liked(NotificationId(id(1)), true)
+                .await
+                .unwrap();
+
+            executor.push(refused());
+            assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+
+            let events = recorder.events();
+            assert_eq!(
+                recorder.heard(),
+                [
+                    (post_like(), true, "waiting"),
+                    (post_like(), true, "refused")
+                ]
+            );
+            assert!(
+                matches!(
+                    &events[1].state,
+                    QueuedActionState::Refused {
+                        error: ReaderError::Api(error)
+                    } if error.status_code() == Some(403)
+                ),
+                "{:?}",
+                events[1].state
+            );
+            assert_eq!(
+                queued_action_event_user_message(&events[1], None).as_deref(),
+                Some("Your like was not added to this post.")
+            );
+            assert_eq!(queued_action_event_user_message(&events[0], None), None);
+            assert_eq!(liked(&service, 1), Some(false));
+        }
+
+        #[tokio::test]
+        async fn a_refusal_the_tap_waits_on_fails_the_call_and_is_heard_once() {
+            let (service, executor) = services();
+            store(&service, &executor, &[new_post(1, false, false)]).await;
+            let recorder = listen(&service.cache);
+            executor.push(refused());
+
+            let error = service
+                .set_post_liked(NotificationId(id(1)), true)
+                .await
+                .unwrap_err();
+
+            assert!(
+                matches!(error, NotificationServiceError::ActionRefused { .. }),
+                "{error:?}"
+            );
+            assert_eq!(
+                recorder.heard(),
+                [
+                    (post_like(), true, "waiting"),
+                    (post_like(), true, "refused")
+                ]
+            );
+        }
+
+        /// The older tap's answer is heard of no more: the newer one is what the user sees.
+        #[tokio::test]
+        async fn a_second_tap_while_the_first_is_in_flight_has_the_only_final_event() {
+            let (service, executor) = services();
+            store(&service, &executor, &[new_post(1, false, false)]).await;
+            let recorder = listen(&service.cache);
+            let sent = executor.sent().len();
+            let (release, held) = oneshot::channel();
+            executor.push(Step::Hold(
+                held,
+                200,
+                json!({ "success": true, "i_like": true, "like_count": 1 }),
+            ));
+            executor.push(like_answer(false));
+
+            let (first, second) =
+                futures::join!(service.set_post_liked(NotificationId(id(1)), true), async {
+                    while executor.sent().len() < sent + 1 {
+                        tokio::task::yield_now().await;
+                    }
+                    let (second, ()) = futures::join!(
+                        service.set_post_liked(NotificationId(id(1)), false),
+                        async { release.send(()).unwrap() }
+                    );
+                    second
+                });
+
+            assert_eq!(first.unwrap(), ReaderActionOutcome::Synced);
+            assert_eq!(second.unwrap(), ReaderActionOutcome::Synced);
+            assert_eq!(
+                recorder.heard(),
+                [
+                    (post_like(), true, "waiting"),
+                    (post_like(), false, "waiting"),
+                    (post_like(), false, "sent"),
+                ]
+            );
+            assert_eq!(executor.sent().len(), sent + 2);
+        }
+
+        /// A tag follow the server answers 200 to, with a list of followed tags that leaves it
+        /// out, is refused. A tag and a seen mark have no message for the user.
+        #[tokio::test]
+        async fn the_readers_other_kinds_are_heard_and_have_no_message_for_the_user() {
+            let (service, reader, executor) = services_with_reader();
+            let recorder = listen(&service.cache);
+            let slug = ReaderTagSlug("art".to_string());
+            executor.push(Step::Respond(
+                200,
+                json!({ "subscribed": true, "tags": [], "added_tags": [4] }),
+            ));
+            let outcome = reader.set_tag_followed(slug.clone(), None, true).await;
+            assert!(
+                matches!(outcome, Err(ReaderError::Refused { .. })),
+                "{outcome:?}"
+            );
+            executor.push(Step::Respond(200, json!({ "status": true })));
+            reader.set_post_seen(post(), true).await.unwrap();
+
+            let tag = QueuedAction::TagFollow { slug };
+            let seen = QueuedAction::PostSeen { post: post() };
+            assert_eq!(
+                recorder.heard(),
+                [
+                    (tag.clone(), true, "waiting"),
+                    (tag, true, "refused"),
+                    (seen.clone(), true, "waiting"),
+                    (seen, true, "sent"),
+                ]
+            );
+            for event in recorder.events() {
+                assert_eq!(queued_action_event_user_message(&event, None), None);
+            }
+        }
+
+        #[tokio::test]
+        async fn adopting_signed_out_tags_is_one_wait_per_tag() {
+            let (service, reader, executor) = services_with_reader();
+            let signed_out = ReaderService::new(
+                delegate(executor.clone()),
+                service.cache.clone(),
+                ReaderOwner::SignedOut,
+                ReaderSavedSource::Ios,
+            )
+            .unwrap();
+            for slug in ["art", "travel"] {
+                signed_out
+                    .set_tag_followed(ReaderTagSlug(slug.to_string()), None, true)
+                    .await
+                    .unwrap();
+            }
+            let recorder = listen(&service.cache);
+            // A signed-out reader's follows only happen on the device, and are heard of by no one.
+            assert!(recorder.heard().is_empty());
+            executor.push(Step::Offline);
+
+            reader.adopt_signed_out_tags().await.unwrap();
+
+            let tag = |slug: &str| QueuedAction::TagFollow {
+                slug: ReaderTagSlug(slug.to_string()),
+            };
+            let mut heard = recorder.heard();
+            heard.sort_by_key(|(action, _, _)| format!("{action:?}"));
+            assert_eq!(
+                heard,
+                [
+                    (tag("art"), true, "waiting"),
+                    (tag("travel"), true, "waiting")
+                ]
+            );
+        }
+
+        #[tokio::test]
+        async fn a_listener_hears_every_cache_object_of_its_file_and_no_other_database() {
+            let (_directory, first, second) = two_caches_of_one_file();
+            let recorder = listen(&first);
+            let in_memory = cache();
+            let other_in_memory = cache();
+            let in_memory_recorder = listen(&in_memory);
+
+            let executor = Arc::new(ScriptedExecutor::default());
+            let reader = reader_in(&executor, second, USER);
+            executor.push(Step::Offline);
+            reader
+                .set_post_liked(post(), true, ReaderPageViewChoice::DontCount)
+                .await
+                .unwrap();
+            assert_eq!(recorder.heard(), [(post_like(), true, "waiting")]);
+
+            let other_reader = reader_in(&executor, other_in_memory, USER);
+            executor.push(Step::Offline);
+            other_reader
+                .set_post_liked(post(), true, ReaderPageViewChoice::DontCount)
+                .await
+                .unwrap();
+            assert!(in_memory_recorder.heard().is_empty());
+            assert_eq!(recorder.heard().len(), 1);
+        }
+
+        #[tokio::test]
+        async fn a_removed_listener_hears_nothing_more_and_each_listener_hears_once() {
+            let (service, executor) = services();
+            store(&service, &executor, &[comment(2, false)]).await;
+            let first = Arc::new(Recorder::default());
+            let second = Arc::new(Recorder::default());
+            let first_id = add_queued_action_listener(service.cache.clone(), first.clone());
+            add_queued_action_listener(service.cache.clone(), second.clone());
+
+            executor.push(Step::Offline);
+            service
+                .set_comment_liked(NotificationId(id(2)), true)
+                .await
+                .unwrap();
+            let comment_like = QueuedAction::CommentLike {
+                site_id: WpComSiteId(SITE),
+                comment_id: CommentId(COMMENT as i64),
+            };
+            assert_eq!(first.heard(), [(comment_like.clone(), true, "waiting")]);
+            assert_eq!(second.heard(), first.heard());
+
+            assert!(remove_queued_action_listener(
+                service.cache.clone(),
+                first_id
+            ));
+            assert!(!remove_queued_action_listener(
+                service.cache.clone(),
+                first_id
+            ));
+            executor.push(like_answer(true));
+            assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+            assert_eq!(first.heard().len(), 1);
+            assert_eq!(
+                second.heard(),
+                [
+                    (comment_like.clone(), true, "waiting"),
+                    (comment_like, true, "sent")
+                ]
+            );
+        }
+
+        /// Counts what waits each time it hears of a change.
+        struct Counter {
+            service: Arc<NotificationService>,
+            counts: Mutex<Vec<u64>>,
+        }
+
+        impl QueuedActionListener for Counter {
+            fn queued_action_changed(&self, _event: QueuedActionEvent) {
+                let count = self.service.pending_action_count().unwrap();
+                self.counts.lock().unwrap().push(count);
+            }
+        }
+
+        #[tokio::test]
+        async fn a_listener_can_call_back_into_the_library() {
+            let (service, executor) = services();
+            store(&service, &executor, &[new_post(1, false, false)]).await;
+            let service = Arc::new(service);
+            let counter = Arc::new(Counter {
+                service: service.clone(),
+                counts: Mutex::default(),
+            });
+            add_queued_action_listener(service.cache.clone(), counter.clone());
+            executor.push(like_answer(true));
+
+            service
+                .set_post_liked(NotificationId(id(1)), true)
+                .await
+                .unwrap();
+
+            assert_eq!(*counter.counts.lock().unwrap(), [1, 0]);
+        }
+
+        #[test]
+        fn only_a_refused_like_or_follow_has_a_message_for_the_user() {
+            let event = |action: QueuedAction, on: bool| QueuedActionEvent {
+                user_id: USER,
+                action,
+                on,
+                state: QueuedActionState::Refused {
+                    error: ReaderError::MissingIds,
+                },
+            };
+            let follow = QueuedAction::Follow {
+                site_id: Some(WpComSiteId(7005)),
+                feed_id: None,
+                url: None,
+            };
+            let comment_like = QueuedAction::CommentLike {
+                site_id: WpComSiteId(SITE),
+                comment_id: CommentId(COMMENT as i64),
+            };
+            let messages: Vec<Option<String>> = [
+                event(post_like(), false),
+                event(comment_like.clone(), true),
+                event(comment_like, false),
+                event(follow.clone(), true),
+                event(follow.clone(), false),
+            ]
+            .iter()
+            .map(|event| queued_action_event_user_message(event, None))
+            .collect();
+            assert_eq!(
+                messages,
+                [
+                    Some("Your like is still on this post.".to_string()),
+                    Some("Your like was not added to this comment.".to_string()),
+                    Some("Your like is still on this comment.".to_string()),
+                    Some("You are not subscribed to this site.".to_string()),
+                    Some("You are still subscribed to this site.".to_string()),
+                ]
+            );
+            let site_id = WpComSiteId(7005);
+            for action in [
+                QueuedAction::PostSeen { post: post() },
+                QueuedAction::SiteBlock { site_id },
+                QueuedAction::TagFollow {
+                    slug: ReaderTagSlug("art".to_string()),
+                },
+                QueuedAction::PostEmails { site_id },
+                QueuedAction::CommentEmails { site_id },
+                QueuedAction::PostNotifications { site_id },
+                QueuedAction::CommentsSubscription { post: post() },
+                QueuedAction::CommentNotifications { post: post() },
+            ] {
+                assert_eq!(
+                    queued_action_event_user_message(&event(action, true), None),
+                    None
+                );
+            }
+            let mut sent = event(follow, true);
+            sent.state = QueuedActionState::Sent;
+            assert_eq!(queued_action_event_user_message(&sent, None), None);
+        }
+    }
 }

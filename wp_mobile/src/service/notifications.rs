@@ -915,7 +915,7 @@ mod changes;
 pub use changes::NotificationChangeOutcome;
 
 mod note_actions;
-pub(crate) use note_actions::{NoteActionTarget, store_note_action};
+pub(crate) use note_actions::{NoteActionKind, NoteActionTarget, store_note_action};
 pub use note_actions::{NotificationNoteChange, notification_service_error_user_message};
 
 #[cfg(test)]

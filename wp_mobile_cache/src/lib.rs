@@ -403,8 +403,9 @@ pub fn does_sqlite_support_returning(version: &str) -> bool {
     false
 }
 
-/// Values in memory that every service of one owner row of a database shares, by row and type.
-type SharedState = Mutex<HashMap<(RowId, TypeId), Arc<dyn Any + Send + Sync>>>;
+/// Values in memory that every service of a database shares, by type: one per owner row, keyed by
+/// `Some(row)`, or one for the whole database, keyed by `None`.
+type SharedState = Mutex<HashMap<(Option<RowId>, TypeId), Arc<dyn Any + Send + Sync>>>;
 
 /// Tells one database file from another. Two paths to one file are equal. A file made where
 /// another was deleted isn't equal to it, while that one is still open.
@@ -649,6 +650,16 @@ impl WpApiCache {
     /// returns the same `T`, which lives until the last of them is dropped. A database with no
     /// file, such as one in memory, has its own. Removing the owner drops it.
     pub fn shared_state<T: Default + Send + Sync + 'static>(&self, owner_row: RowId) -> Arc<T> {
+        self.shared_value(Some(owner_row))
+    }
+
+    /// Returns the one `T` of the whole database, made the first time it's asked for, as
+    /// [`Self::shared_state`] does for an owner. Removing an owner leaves it.
+    pub fn database_shared_state<T: Default + Send + Sync + 'static>(&self) -> Arc<T> {
+        self.shared_value(None)
+    }
+
+    fn shared_value<T: Default + Send + Sync + 'static>(&self, owner_row: Option<RowId>) -> Arc<T> {
         let value = self
             .shared
             .lock()
@@ -674,7 +685,7 @@ impl WpApiCache {
             self.shared
                 .lock()
                 .expect("shared state lock poisoned")
-                .retain(|(owner_row, _), _| *owner_row != row);
+                .retain(|(owner_row, _), _| *owner_row != Some(row));
         }
         Ok(removed)
     }
@@ -1105,6 +1116,35 @@ mod tests {
 
         assert!(!Arc::ptr_eq(&removed_state, &first.shared_state(removed)));
         assert!(Arc::ptr_eq(&kept_state, &first.shared_state(kept)));
+    }
+
+    #[test]
+    fn test_every_cache_of_one_file_has_the_same_database_shared_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let first = open_cache(&path);
+        first.perform_migrations().unwrap();
+        let second = open_cache(&path);
+        let shared = first.database_shared_state::<Marker>();
+        assert!(Arc::ptr_eq(&shared, &second.database_shared_state()));
+        // It isn't any owner's.
+        assert!(!Arc::ptr_eq(&shared, &first.shared_state(RowId(1))));
+
+        first
+            .execute(|connection| {
+                WordPressComAccountRepository::get_or_create(connection, WpComUserId(1))
+            })
+            .unwrap();
+        assert!(second.remove_wordpress_com_account(WpComUserId(1)).unwrap());
+        assert!(Arc::ptr_eq(&shared, &first.database_shared_state()));
+
+        let other_file = open_cache(&directory.path().join("other.sqlite"));
+        assert!(!Arc::ptr_eq(&shared, &other_file.database_shared_state()));
+        let in_memory = WpApiCache::new(None).unwrap();
+        assert!(!Arc::ptr_eq(
+            &in_memory.database_shared_state::<Marker>(),
+            &WpApiCache::new(None).unwrap().database_shared_state()
+        ));
     }
 
     #[test]

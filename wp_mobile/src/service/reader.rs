@@ -66,7 +66,7 @@ const UNUSED_POST_LIFETIME: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const SAVED_STREAM: &str = "saved";
 
 #[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
-#[derive(Debug, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
 pub enum ReaderError {
     #[error("{0}")]
     Api(WpApiError),
