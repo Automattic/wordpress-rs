@@ -30,6 +30,7 @@ mod sites;
 mod stream;
 mod tags;
 
+pub(crate) use actions::{ActionContext, waiting_note_actions};
 pub use actions::{
     ReaderActionOutcome, ReaderFollowTarget, ReaderRefusedTag, ReaderTagAdoptionReport,
 };
@@ -51,7 +52,6 @@ pub use stream::{
 pub use tags::ReaderCachedMenu;
 
 use super::reader_saved::ReaderSavedService;
-use actions::ActionQueue;
 use collection::StreamLanes;
 use language::ReaderLanguage;
 
@@ -166,8 +166,9 @@ pub(crate) struct ReaderContext {
     pub(crate) owner_row: RowId,
     /// The app, which is recorded with what the reader does.
     pub(crate) source: ReaderSavedSource,
-    /// What the reader turned on or off that's waiting to be sent.
-    pub(crate) actions: ActionQueue,
+    /// The account's queue of what the user turned on or off, shared with the account's other
+    /// services on this cache.
+    pub(crate) actions: ActionContext,
     /// Sends requests that aren't to the API, such as the one that counts a view.
     pub(crate) request_executor: Arc<dyn RequestExecutor>,
     /// The reader's language: see [`ReaderService::set_language`].
@@ -352,6 +353,7 @@ impl ReaderService {
         Ok(Self {
             saved: Arc::new(saved),
             context: Arc::new(ReaderContext {
+                actions: ActionContext::new(delegate.clone(), cache.clone(), owner, owner_row),
                 // The Reader sends its own language: see `ReaderService`.
                 client: WpComApiClient::new(WpApiClientDelegate {
                     language_provider: None,
@@ -361,13 +363,20 @@ impl ReaderService {
                 owner,
                 owner_row,
                 source: saved_source,
-                actions: ActionQueue::default(),
                 request_executor,
                 language: Mutex::default(),
                 clock,
             }),
             lanes: Mutex::default(),
         })
+    }
+}
+
+#[cfg(test)]
+impl ReaderService {
+    /// The account's queue context, for tests that compare queues across services.
+    pub(crate) fn actions(&self) -> &ActionContext {
+        &self.context.actions
     }
 }
 

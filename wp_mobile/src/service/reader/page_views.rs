@@ -236,8 +236,9 @@ impl ReaderContext {
             Some(false) => {
                 let action = Action::Seen {
                     post: post.identity.clone(),
+                    source: self.seen_source(),
                 };
-                match self.set_action(action, true).await {
+                match self.actions.set_action(action, true).await {
                     Ok(outcome) => ReaderOpenedSeen::Marked { outcome },
                     Err(error) => ReaderOpenedSeen::Failed { error },
                 }

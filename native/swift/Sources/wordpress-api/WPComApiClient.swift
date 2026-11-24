@@ -178,8 +178,9 @@ public final class WPComApiClient: Sendable {
     /// save. Call `syncActions()` at launch, when the app comes to the foreground, and when the
     /// device comes back online.
     ///
-    /// Create one per reader and share it: it sends one change at a time, and a second instance
-    /// would send alongside it.
+    /// Create one per reader and share it: it sends its saves one at a time, and a second instance
+    /// would send them alongside it. Its other changes go in the account's one queue in `cache`,
+    /// which the account's notifications service shares.
     public func makeReaderService(
         cache: WordPressApiCache,
         owner: ReaderOwner,
@@ -189,10 +190,12 @@ public final class WPComApiClient: Sendable {
     }
 
     /// Creates the notifications service for one account. It keeps the account's notes in
-    /// `cache`, syncs the newest by comparing hashes, and loads older ones a page at a time. Every
-    /// request it sends is a GET.
+    /// `cache`, syncs the newest by comparing hashes, and loads older ones a page at a time. Its
+    /// syncs send only GET requests.
     ///
-    /// The cache's migrations must have run. Create one per account and share it.
+    /// Likes and follows made from a note go in the account's one queue in `cache`, which the
+    /// account's Reader service shares, so they're sent whichever of the two exist. The cache's
+    /// migrations must have run. Create one per account and share it.
     public func makeNotificationService(
         cache: WordPressApiCache,
         userID: WpComUserId

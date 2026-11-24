@@ -789,6 +789,8 @@ async fn a_change_to_the_notification_tables_is_relevant() {
     };
     assert!(service.is_relevant_update(&hook(DbTable::Notifications)));
     assert!(service.is_relevant_update(&hook(DbTable::NotificationSyncState)));
+    // A like or follow waiting to be sent shows on the notes.
+    assert!(service.is_relevant_update(&hook(DbTable::ReaderActions)));
     assert!(!service.is_relevant_update(&hook(DbTable::ReaderPosts)));
 }
 
@@ -1906,4 +1908,915 @@ async fn each_account_keeps_its_own_changes() {
     assert_eq!(first.pending_change_count().unwrap(), 1);
     assert_eq!(second.pending_change_count().unwrap(), 0);
     assert_eq!(tab_shown(&second, NotificationTab::Unread), [3, 2, 1]);
+}
+
+/// Liking and following from a note. Sites 7001 to 7003, post 42 and comment 55 are invented.
+mod note_actions {
+    use super::*;
+    use crate::service::reader::{
+        ReaderActionOutcome, ReaderFollowTarget, ReaderPageViewChoice, ReaderPostLikeResult,
+        ReaderService,
+    };
+    use futures::channel::oneshot;
+    use wp_api::wp_com::WpComSiteId;
+    use wp_api::wp_com::notifications::{
+        NotificationActionKind, NotificationLayoutContent, NotificationNewPostByline,
+        notification_layout,
+    };
+    use wp_api::wp_com::reader_saved::{ReaderPostSaveIdentity, ReaderSavedSource};
+    use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
+
+    const SITE: u64 = 7001;
+    const POST: u64 = 42;
+    const COMMENT: u64 = 55;
+    /// The site of the person behind the notes.
+    const AUTHOR_SITE: u64 = 7002;
+
+    /// A person's block, offering to follow their site.
+    fn person(site: u64, following: bool) -> Value {
+        json!({
+            "type": "user",
+            "text": "A person",
+            "meta": {
+                "ids": { "site": site, "user": 9 },
+                "links": { "home": "https://author.example" },
+                "titles": { "home": "An author's site" },
+            },
+            "actions": { "follow": following },
+        })
+    }
+
+    /// Note `n`, a new post on site 7001, whose post the user can like, by a person whose site
+    /// the user can follow.
+    fn new_post(n: u64, liked: bool, following: bool) -> Value {
+        json!({
+            "id": id(n),
+            "type": "new_post",
+            "read": 0,
+            "timestamp": rfc3339(T + n as i64),
+            "note_hash": 100 + n,
+            "subject": [{ "text": "A new post" }],
+            "meta": {
+                "ids": { "site": SITE, "post": POST },
+                "actor": { "name": "A person" },
+                "actor_count": 1,
+                "post": { "title": "A post", "url": "https://site.example/a-post" },
+                "site": { "name": "A site", "url": "https://site.example" },
+            },
+            "body": [
+                person(AUTHOR_SITE, following),
+                {
+                    "type": "post",
+                    "text": "The post",
+                    "meta": { "ids": { "site": SITE, "post": POST } },
+                    "actions": { "like-post": liked },
+                },
+            ],
+        })
+    }
+
+    /// Note `n`, a comment on post 42 whose comment the user can like.
+    fn comment(n: u64, liked: bool) -> Value {
+        json!({
+            "id": id(n),
+            "type": "comment",
+            "read": 0,
+            "timestamp": rfc3339(T + n as i64),
+            "note_hash": 100 + n,
+            "subject": [{ "text": "A comment" }],
+            "meta": { "ids": { "site": SITE, "post": POST, "comment": COMMENT } },
+            "body": [
+                person(7003, false),
+                {
+                    "type": "comment",
+                    "text": "The comment",
+                    "meta": { "ids": { "site": SITE, "post": POST, "comment": COMMENT } },
+                    "actions": { "like-comment": liked, "replyto-comment": true },
+                },
+            ],
+        })
+    }
+
+    /// A service that checks ten notes at a time, and its executor. No Reader service exists.
+    fn services() -> (NotificationService, Arc<ScriptedExecutor>) {
+        service_in(cache(), USER, 10)
+    }
+
+    /// The Reader service of `user_id` in `cache`, sending through `executor`.
+    fn reader_in(
+        executor: &Arc<ScriptedExecutor>,
+        cache: Arc<WpApiCache>,
+        user_id: WpComUserId,
+    ) -> ReaderService {
+        ReaderService::new(
+            delegate(executor.clone()),
+            cache,
+            ReaderOwner::Account { user_id },
+            ReaderSavedSource::Ios,
+        )
+        .unwrap()
+    }
+
+    /// A service that checks ten notes at a time, the account's Reader service on the same
+    /// cache, and their executor.
+    fn services_with_reader() -> (NotificationService, ReaderService, Arc<ScriptedExecutor>) {
+        let cache = cache();
+        let (service, executor) = service_in(cache.clone(), USER, 10);
+        let reader = reader_in(&executor, cache, USER);
+        (service, reader, executor)
+    }
+
+    /// Syncs `notes` into the cache, each listed with its own hash.
+    async fn store(service: &NotificationService, executor: &ScriptedExecutor, notes: &[Value]) {
+        let listed: Vec<Value> = notes
+            .iter()
+            .map(|note| json!({ "id": note["id"], "note_hash": note["note_hash"] }))
+            .collect();
+        executor.push(Step::Respond(
+            200,
+            json!({ "last_seen_time": T.to_string(), "notes": listed }),
+        ));
+        executor.push(Step::Respond(
+            200,
+            json!({ "last_seen_time": T.to_string(), "notes": notes }),
+        ));
+        service.sync().await.unwrap();
+    }
+
+    /// Whether cached note `n` shows its first `kind` action on.
+    fn shown_action(
+        service: &NotificationService,
+        n: u64,
+        kind: NotificationActionKind,
+    ) -> Option<bool> {
+        let notes = service.load_notes(NotificationsFilter::default()).unwrap();
+        let note = notes.iter().find(|note| note.id.0 == id(n))?;
+        note.body
+            .iter()
+            .flat_map(|block| block.actions.iter())
+            .find(|action| action.kind == kind)
+            .and_then(|action| action.is_on)
+    }
+
+    fn liked(service: &NotificationService, n: u64) -> Option<bool> {
+        shown_action(service, n, NotificationActionKind::LikePost)
+    }
+
+    /// The request sent last: its method, path and body.
+    fn last_sent(executor: &ScriptedExecutor) -> (RequestMethod, String, Option<Value>) {
+        let sent = executor.sent().last().cloned().unwrap();
+        let url = url::Url::parse(&sent.url).unwrap();
+        (sent.method, url.path().to_string(), sent.body)
+    }
+
+    fn like_answer(liked: bool) -> Step {
+        Step::Respond(
+            200,
+            json!({ "success": true, "i_like": liked, "like_count": u64::from(liked) }),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_like_from_a_note_shows_at_once_on_every_note_about_the_post_and_stays_when_taken() {
+        let (service, executor) = services();
+        store(
+            &service,
+            &executor,
+            &[new_post(1, false, false), new_post(2, false, false)],
+        )
+        .await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "success": true, "i_like": true, "like_count": 1 }),
+        ));
+
+        let (outcome, ()) =
+            futures::join!(service.set_post_liked(NotificationId(id(1)), true), async {
+                assert_eq!(liked(&service, 1), Some(true));
+                assert_eq!(
+                    liked(&service, 2),
+                    Some(true),
+                    "Another note about the post"
+                );
+                release.send(()).unwrap();
+            });
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(
+            last_sent(&executor),
+            (
+                RequestMethod::POST,
+                format!("/rest/v1.1/sites/{SITE}/posts/{POST}/likes/new"),
+                None
+            )
+        );
+        // Nothing waits, so the stored notes have the like.
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+        assert_eq!(liked(&service, 1), Some(true));
+        assert_eq!(liked(&service, 2), Some(true));
+    }
+
+    #[tokio::test]
+    async fn an_unlike_from_a_note_unlikes_its_comment() {
+        let (service, executor) = services();
+        store(&service, &executor, &[comment(1, true)]).await;
+        executor.push(like_answer(false));
+
+        let outcome = service
+            .set_comment_liked(NotificationId(id(1)), false)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, ReaderActionOutcome::Synced);
+        assert_eq!(
+            shown_action(&service, 1, NotificationActionKind::LikeComment),
+            Some(false)
+        );
+        assert_eq!(
+            last_sent(&executor).1,
+            format!("/rest/v1.1/sites/{SITE}/comments/{COMMENT}/likes/mine/delete")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_follow_from_a_note_follows_the_blocks_site_and_its_layout_shows_it_at_once() {
+        let (service, executor) = services();
+        store(&service, &executor, &[new_post(1, false, false)]).await;
+        let following = |service: &NotificationService| {
+            let note = service.load_notes(NotificationsFilter::default()).unwrap()[0].clone();
+            let NotificationLayoutContent::NewPost { layout } = notification_layout(&note).content
+            else {
+                panic!("Expected the new post layout");
+            };
+            let Some(NotificationNewPostByline::Site { meta_line, .. }) = layout.byline else {
+                panic!("Expected a site byline");
+            };
+            meta_line.follow.unwrap()
+        };
+        assert_eq!(following(&service).site_id, WpComSiteId(AUTHOR_SITE));
+        assert!(!following(&service).is_following);
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(held, 200, json!({ "subscribed": true })));
+
+        let (outcome, ()) = futures::join!(
+            service.set_site_followed(NotificationId(id(1)), WpComSiteId(AUTHOR_SITE), true),
+            async {
+                assert!(following(&service).is_following);
+                release.send(()).unwrap();
+            }
+        );
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert!(following(&service).is_following);
+        // A follow goes by the block's site address, as the Reader follows, with no source, as
+        // the web notifications panel sends it.
+        assert_eq!(
+            last_sent(&executor),
+            (
+                RequestMethod::POST,
+                "/rest/v1.1/read/following/mine/new".to_string(),
+                Some(json!({ "url": "https://author.example" }))
+            )
+        );
+
+        // An unfollow goes by the site's ID.
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "is_following": false }),
+        ));
+        service
+            .set_site_followed(NotificationId(id(1)), WpComSiteId(AUTHOR_SITE), false)
+            .await
+            .unwrap();
+        assert!(!following(&service).is_following);
+        assert_eq!(
+            last_sent(&executor).1,
+            format!("/rest/v1.1/sites/{AUTHOR_SITE}/follows/mine/delete")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_like_made_offline_shows_at_once_and_the_services_own_send_sends_it() {
+        let (service, executor) = services();
+        store(&service, &executor, &[new_post(1, false, false)]).await;
+        executor.push(Step::Offline);
+
+        let outcome = service
+            .set_post_liked(NotificationId(id(1)), true)
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(outcome, ReaderActionOutcome::Pending { .. }),
+            "{outcome:?}"
+        );
+        assert_eq!(liked(&service, 1), Some(true));
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+        // A read change waiting too is counted apart, and both are sent.
+        executor.push(Step::Offline);
+        service.mark_read(note_ids(&[1])).await.unwrap();
+        assert_eq!(service.pending_change_count().unwrap(), 1);
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+
+        executor.push(Step::Respond(200, taken(&[])));
+        executor.push(like_answer(true));
+        assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+        assert_eq!(liked(&service, 1), Some(true));
+        assert_eq!(
+            last_sent(&executor).1,
+            format!("/rest/v1.1/sites/{SITE}/posts/{POST}/likes/new")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refused_like_shows_the_servers_state_and_fails_with_a_message_for_the_user() {
+        let (service, executor) = services();
+        store(&service, &executor, &[new_post(1, false, false)]).await;
+        executor.push(Step::Respond(
+            403,
+            json!({ "error": "unauthorized", "message": "You can't like this post." }),
+        ));
+
+        let error = service
+            .set_post_liked(NotificationId(id(1)), true)
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                &error,
+                NotificationServiceError::ActionRefused {
+                    change: NotificationNoteChange::LikePost,
+                    error: ReaderError::Api(_),
+                }
+            ),
+            "{error:?}"
+        );
+        assert_eq!(liked(&service, 1), Some(false));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+        assert_eq!(
+            notification_service_error_user_message(&error, None).as_deref(),
+            Some("Your like was not added to this post.")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_follow_the_server_answers_without_making_shows_the_site_unfollowed_again() {
+        let (service, executor) = services();
+        store(&service, &executor, &[new_post(1, false, false)]).await;
+        // The API answers 200 for an address it can't follow.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": false, "info": "invalid_feed" }),
+        ));
+
+        let error = service
+            .set_site_followed(NotificationId(id(1)), WpComSiteId(AUTHOR_SITE), true)
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                &error,
+                NotificationServiceError::ActionRefused {
+                    change: NotificationNoteChange::FollowSite,
+                    error: ReaderError::Refused { .. },
+                }
+            ),
+            "{error:?}"
+        );
+        assert_eq!(
+            shown_action(&service, 1, NotificationActionKind::Follow),
+            Some(false)
+        );
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+        assert_eq!(
+            notification_service_error_user_message(&error, None).as_deref(),
+            Some("You are not subscribed to this site.")
+        );
+    }
+
+    #[test]
+    fn only_a_refusal_has_a_message_for_the_user() {
+        let messages: Vec<Option<String>> = [
+            NotificationNoteChange::UnlikePost,
+            NotificationNoteChange::LikeComment,
+            NotificationNoteChange::UnlikeComment,
+            NotificationNoteChange::FollowSite,
+            NotificationNoteChange::UnfollowSite,
+        ]
+        .into_iter()
+        .map(|change| {
+            notification_service_error_user_message(
+                &NotificationServiceError::ActionRefused {
+                    change,
+                    error: ReaderError::MissingIds,
+                },
+                None,
+            )
+        })
+        .collect();
+        assert_eq!(
+            messages,
+            [
+                Some("Your like is still on this post.".to_string()),
+                Some("Your like was not added to this comment.".to_string()),
+                Some("Your like is still on this comment.".to_string()),
+                Some("You are not subscribed to this site.".to_string()),
+                Some("You are still subscribed to this site.".to_string()),
+            ]
+        );
+        for developer_only in [
+            NotificationServiceError::NoteNotCached {
+                note_id: NotificationId(id(1)),
+            },
+            NotificationServiceError::ActionNotOffered {
+                change: NotificationNoteChange::LikePost,
+            },
+            NotificationServiceError::CannotPageFurther,
+        ] {
+            assert_eq!(
+                notification_service_error_user_message(&developer_only, None),
+                None
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_sync_before_the_like_is_sent_does_not_undo_it_and_the_sync_after_agrees() {
+        let (service, executor) = services();
+        store(&service, &executor, &[new_post(1, false, false)]).await;
+        executor.push(Step::Offline);
+        service
+            .set_post_liked(NotificationId(id(1)), true)
+            .await
+            .unwrap();
+
+        // The note changed on the server, and still isn't liked there.
+        let mut unliked = new_post(1, false, false);
+        unliked["note_hash"] = json!(201);
+        store(&service, &executor, &[unliked]).await;
+        assert_eq!(liked(&service, 1), Some(true));
+
+        executor.push(like_answer(true));
+        assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+        assert_eq!(liked(&service, 1), Some(true));
+
+        // The server's copy now has the like.
+        let mut taken = new_post(1, true, false);
+        taken["note_hash"] = json!(301);
+        store(&service, &executor, &[taken]).await;
+        assert_eq!(liked(&service, 1), Some(true));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    /// A whole note fetched while a like is on its way could be the copy from before the like,
+    /// stored over the like the server took. So the download waits for the like's answer.
+    #[tokio::test]
+    async fn a_sync_downloads_no_note_while_a_like_is_being_sent() {
+        let (service, executor) = services();
+        store(&service, &executor, &[new_post(1, false, false)]).await;
+        let sent = executor.sent().len();
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "success": true, "i_like": true, "like_count": 1 }),
+        ));
+        let mut changed = new_post(1, true, false);
+        changed["note_hash"] = json!(201);
+        executor.push(Step::Respond(
+            200,
+            json!({ "last_seen_time": T.to_string(), "notes": [{ "id": id(1), "note_hash": 201 }] }),
+        ));
+        executor.push(Step::Respond(
+            200,
+            json!({ "last_seen_time": T.to_string(), "notes": [changed] }),
+        ));
+
+        let (like, sync, ()) = futures::join!(
+            service.set_post_liked(NotificationId(id(1)), true),
+            service.sync(),
+            async {
+                // The like and the sync's list of hashes are sent; the download waits.
+                while executor.sent().len() < sent + 2 {
+                    tokio::task::yield_now().await;
+                }
+                for _ in 0..10 {
+                    tokio::task::yield_now().await;
+                }
+                assert_eq!(executor.sent().len(), sent + 2);
+                release.send(()).unwrap();
+            }
+        );
+
+        assert_eq!(like.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(sync.unwrap().downloaded_count, 1);
+        assert_eq!(executor.sent().len(), sent + 3);
+        assert_eq!(liked(&service, 1), Some(true));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_like_made_in_the_reader_shows_on_the_note_and_is_the_same_like() {
+        let (service, reader, executor) = services_with_reader();
+        store(&service, &executor, &[new_post(1, false, false)]).await;
+        let post = ReaderPostSaveIdentity {
+            id: POST,
+            site_id: Some(WpComSiteId(SITE)),
+            feed_id: Some(wp_api::wp_com::reader_saved::ReaderFeedId(5)),
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        };
+        executor.push(Step::Offline);
+
+        let outcome = reader
+            .set_post_liked(post, true, ReaderPageViewChoice::DontCount)
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            outcome.like,
+            ReaderPostLikeResult::Done {
+                outcome: ReaderActionOutcome::Pending { .. }
+            }
+        ));
+        assert_eq!(liked(&service, 1), Some(true));
+
+        // Unliking it from the note replaces the Reader's like: one row, one request.
+        executor.push(Step::Offline);
+        service
+            .set_post_liked(NotificationId(id(1)), false)
+            .await
+            .unwrap();
+        assert_eq!(liked(&service, 1), Some(false));
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+        assert_eq!(reader.pending_action_count().unwrap(), 1);
+        executor.push(like_answer(false));
+        assert_eq!(reader.sync_actions().await.unwrap(), 0);
+        assert_eq!(
+            last_sent(&executor).1,
+            format!("/rest/v1.1/sites/{SITE}/posts/{POST}/likes/mine/delete")
+        );
+        assert_eq!(liked(&service, 1), Some(false));
+    }
+
+    #[tokio::test]
+    async fn a_note_without_the_action_or_not_in_the_cache_sends_nothing() {
+        let (service, executor) = services();
+        store(
+            &service,
+            &executor,
+            &[new_post(1, false, false), note_json(2, T + 2, 12)],
+        )
+        .await;
+        let sent = executor.sent().len();
+
+        let errors = [
+            service.set_post_liked(NotificationId(id(2)), true).await,
+            service.set_comment_liked(NotificationId(id(1)), true).await,
+            service
+                .set_site_followed(NotificationId(id(1)), WpComSiteId(SITE), true)
+                .await,
+            service.set_post_liked(NotificationId(id(9)), false).await,
+        ]
+        .map(Result::unwrap_err);
+
+        assert!(matches!(
+            errors[0],
+            NotificationServiceError::ActionNotOffered {
+                change: NotificationNoteChange::LikePost
+            }
+        ));
+        assert!(matches!(
+            errors[1],
+            NotificationServiceError::ActionNotOffered {
+                change: NotificationNoteChange::LikeComment
+            }
+        ));
+        assert!(matches!(
+            errors[2],
+            NotificationServiceError::ActionNotOffered {
+                change: NotificationNoteChange::FollowSite
+            }
+        ));
+        assert!(matches!(
+            errors[3],
+            NotificationServiceError::NoteNotCached { note_id } if note_id == NotificationId(id(9))
+        ));
+        assert_eq!(executor.sent().len(), sent);
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    /// The paths of the requests sent after the first `skip`, with their bodies.
+    fn sent_after(executor: &ScriptedExecutor, skip: usize) -> Vec<(String, Option<Value>)> {
+        executor
+            .sent()
+            .iter()
+            .skip(skip)
+            .map(|sent| {
+                let url = url::Url::parse(&sent.url).unwrap();
+                (url.path().to_string(), sent.body.clone())
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn unliking_a_post_and_liking_a_comment_need_no_reader_service() {
+        let (service, executor) = services();
+        store(
+            &service,
+            &executor,
+            &[new_post(1, true, false), comment(2, false)],
+        )
+        .await;
+        let sent = executor.sent().len();
+
+        executor.push(like_answer(false));
+        let unliked = service.set_post_liked(NotificationId(id(1)), false);
+        assert_eq!(unliked.await.unwrap(), ReaderActionOutcome::Synced);
+        executor.push(like_answer(true));
+        let liked_comment = service.set_comment_liked(NotificationId(id(2)), true);
+        assert_eq!(liked_comment.await.unwrap(), ReaderActionOutcome::Synced);
+
+        assert_eq!(
+            sent_after(&executor, sent),
+            [
+                (
+                    format!("/rest/v1.1/sites/{SITE}/posts/{POST}/likes/mine/delete"),
+                    None
+                ),
+                (
+                    format!("/rest/v1.1/sites/{SITE}/comments/{COMMENT}/likes/new"),
+                    None
+                ),
+            ]
+        );
+        // Nothing waits, so what shows is what the stored notes now have.
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+        assert_eq!(liked(&service, 1), Some(false));
+        assert_eq!(
+            shown_action(&service, 2, NotificationActionKind::LikeComment),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn an_account_has_one_queue_on_one_cache_whichever_services_exist() {
+        let cache = cache();
+        let (service, executor) = service_in(cache.clone(), USER, 10);
+        let reader = reader_in(&executor, cache.clone(), USER);
+        let second_reader = reader_in(&executor, cache.clone(), USER);
+        let (second_service, _) = service_in(cache.clone(), USER, 10);
+        for queue in [
+            &reader.actions().queue,
+            &second_reader.actions().queue,
+            &second_service.actions.queue,
+        ] {
+            assert!(Arc::ptr_eq(&service.actions.queue, queue));
+        }
+
+        let (other_account, _) = service_in(cache.clone(), WpComUserId(2), 10);
+        let (other_cache, _) = service_in(super::cache(), USER, 10);
+        assert!(!Arc::ptr_eq(
+            &service.actions.queue,
+            &other_account.actions.queue
+        ));
+        assert!(!Arc::ptr_eq(
+            &service.actions.queue,
+            &other_cache.actions.queue
+        ));
+
+        // Signing out drops the account's queue, so whoever signs in next starts with a new one.
+        cache.remove_wordpress_com_account(USER).unwrap();
+        let (signed_in_again, _) = service_in(cache, USER, 10);
+        assert!(!Arc::ptr_eq(
+            &service.actions.queue,
+            &signed_in_again.actions.queue
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_like_made_offline_in_either_service_is_sent_once_by_the_other() {
+        let (service, reader, executor) = services_with_reader();
+        store(
+            &service,
+            &executor,
+            &[new_post(1, false, false), comment(2, false)],
+        )
+        .await;
+
+        // Made from a note, sent by the Reader.
+        executor.push(Step::Offline);
+        service
+            .set_comment_liked(NotificationId(id(2)), true)
+            .await
+            .unwrap();
+        let sent = executor.sent().len();
+        executor.push(like_answer(true));
+        assert_eq!(reader.sync_actions().await.unwrap(), 0);
+        assert_eq!(
+            sent_after(&executor, sent),
+            [(
+                format!("/rest/v1.1/sites/{SITE}/comments/{COMMENT}/likes/new"),
+                None
+            )]
+        );
+
+        // Made in the Reader, sent by the notifications service.
+        let post = ReaderPostSaveIdentity {
+            id: POST,
+            site_id: Some(WpComSiteId(SITE)),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        };
+        executor.push(Step::Offline);
+        reader
+            .set_post_liked(post, true, ReaderPageViewChoice::DontCount)
+            .await
+            .unwrap();
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+        let sent = executor.sent().len();
+        executor.push(like_answer(true));
+        assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+        assert_eq!(
+            sent_after(&executor, sent),
+            [(
+                format!("/rest/v1.1/sites/{SITE}/posts/{POST}/likes/new"),
+                None
+            )]
+        );
+        assert_eq!(liked(&service, 1), Some(true));
+        assert_eq!(reader.pending_action_count().unwrap(), 0);
+    }
+
+    /// Two `WpApiCache` objects of one database file, as an app that opens its file twice has,
+    /// and the folder the file is in, which goes when its guard is dropped.
+    fn two_caches_of_one_file() -> (tempfile::TempDir, Arc<WpApiCache>, Arc<WpApiCache>) {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache.sqlite");
+        let open = || {
+            let path = path.to_str().expect("a UTF-8 path").to_string();
+            Arc::new(WpApiCache::new(Some(path)).expect("the cache opens"))
+        };
+        let first = open();
+        first.perform_migrations().expect("migrations run");
+        (directory, first, open())
+    }
+
+    /// Each service has its own `WpApiCache` of the file, and both send what waits at once.
+    #[tokio::test]
+    async fn services_on_two_cache_objects_of_one_file_send_a_waiting_like_once() {
+        let (_directory, first, second) = two_caches_of_one_file();
+        let (service, executor) = service_in(first, USER, 10);
+        let reader = reader_in(&executor, second, USER);
+        assert!(Arc::ptr_eq(&service.actions.queue, &reader.actions().queue));
+
+        store(&service, &executor, &[comment(2, false)]).await;
+        executor.push(Step::Offline);
+        service
+            .set_comment_liked(NotificationId(id(2)), true)
+            .await
+            .unwrap();
+        assert_eq!(reader.pending_action_count().unwrap(), 1);
+
+        // The like's answer is held, so the second send starts while the first is in flight.
+        let sent = executor.sent().len();
+        let (release, held) = futures::channel::oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "success": true, "i_like": true, "like_count": 1 }),
+        ));
+        let (from_reader, from_service, ()) = tokio::join!(
+            reader.sync_actions(),
+            service.send_pending_changes(),
+            async { release.send(()).unwrap() }
+        );
+        assert_eq!(from_reader.unwrap(), 0);
+        assert_eq!(from_service.unwrap(), 0);
+        assert_eq!(
+            sent_after(&executor, sent),
+            [(
+                format!("/rest/v1.1/sites/{SITE}/comments/{COMMENT}/likes/new"),
+                None
+            )]
+        );
+        assert_eq!(
+            shown_action(&service, 2, NotificationActionKind::LikeComment),
+            Some(true)
+        );
+    }
+
+    /// Each row carries its own source, so the service that sends it doesn't change what's sent.
+    #[tokio::test]
+    async fn the_readers_rows_keep_the_readers_source_when_the_notifications_service_sends_them() {
+        let (service, reader, executor) = services_with_reader();
+        let post = ReaderPostSaveIdentity {
+            id: POST,
+            site_id: Some(WpComSiteId(SITE)),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        };
+        executor.push(Step::Offline);
+        reader.set_post_seen(post, true).await.unwrap();
+        // The seen mark waits first, and gets no answer again.
+        executor.push(Step::Offline);
+        reader
+            .set_followed(
+                ReaderFollowTarget {
+                    site_id: Some(WpComSiteId(7004)),
+                    feed_id: None,
+                    url: Some("https://another.example".to_string()),
+                    name: None,
+                },
+                true,
+            )
+            .await
+            .unwrap();
+        assert_eq!(service.pending_action_count().unwrap(), 2);
+        let sent = executor.sent().len();
+
+        executor.push(Step::Respond(200, json!({ "status": true })));
+        executor.push(Step::Respond(200, json!({ "subscribed": true })));
+        assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+
+        assert_eq!(
+            sent_after(&executor, sent),
+            [
+                (
+                    "/wpcom/v2/seen-posts/seen/blog/new".to_string(),
+                    Some(json!({ "blog_id": SITE, "post_ids": [POST], "source": "reader-ios" }))
+                ),
+                (
+                    "/rest/v1.1/read/following/mine/new".to_string(),
+                    Some(json!({ "url": "https://another.example", "source": "reader-ios" }))
+                ),
+            ]
+        );
+    }
+
+    /// A seen mark stored without its source can't be sent as it was made, so it's dropped. A
+    /// follow stored without one is sent with none.
+    #[tokio::test]
+    async fn a_row_stored_without_a_source() {
+        use wp_mobile_cache::repository::reader_actions::ReaderActionRepository;
+        let (service, executor) = services();
+        let post = ReaderPostSaveIdentity {
+            id: POST,
+            site_id: Some(WpComSiteId(SITE)),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        };
+        let seen = json!({ "action": "seen", "post": post });
+        let follow = json!({
+            "action": "follow",
+            "site_id": 7004,
+            "feed_id": null,
+            "url": "https://another.example",
+            "name": null,
+        });
+        service.cache.execute(|connection| {
+            ReaderActionRepository::tap(
+                &*connection,
+                service.account,
+                1,
+                "a seen mark",
+                true,
+                None,
+                &seen.to_string(),
+            )
+            .unwrap();
+            ReaderActionRepository::tap(
+                &*connection,
+                service.account,
+                4,
+                "site:7004",
+                true,
+                None,
+                &follow.to_string(),
+            )
+            .unwrap();
+        });
+        executor.push(Step::Respond(200, json!({ "subscribed": true })));
+
+        assert_eq!(service.send_pending_changes().await.unwrap(), 0);
+        assert_eq!(
+            sent_after(&executor, 0),
+            [(
+                "/rest/v1.1/read/following/mine/new".to_string(),
+                Some(json!({ "url": "https://another.example" }))
+            )]
+        );
+    }
 }

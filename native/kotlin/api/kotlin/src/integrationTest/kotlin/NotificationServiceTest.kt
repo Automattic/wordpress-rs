@@ -11,9 +11,14 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.localizedDescription
 import uniffi.wp_mobile.NotificationChangeOutcome
+import uniffi.wp_mobile.NotificationNoteChange
+import uniffi.wp_mobile.NotificationServiceException
 import uniffi.wp_mobile.NotificationsFilter
+import uniffi.wp_mobile.ReaderException
+import uniffi.wp_mobile.notificationServiceErrorUserMessage
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -121,5 +126,30 @@ class NotificationServiceTest {
         // Removing a note sends no request.
         assertTrue(service.removeNote(10_000_000_002uL))
         assertTrue(service.loadTabNotes(NotificationTab.UNREAD).isEmpty())
+    }
+
+    @Test
+    fun aNoteThatIsNotCachedCannotBeLikedOrFollowed() = runTest {
+        val cache = WordPressApiCache()
+        cache.performMigrations()
+        val service = client.makeNotificationService(cache, 1uL)
+
+        val error = assertFailsWith<NotificationServiceException.NoteNotCached> {
+            service.setPostLiked(10_000_000_009uL, true)
+        }
+        assertEquals(10_000_000_009uL, error.noteId)
+        assertFailsWith<NotificationServiceException.NoteNotCached> {
+            service.setCommentLiked(10_000_000_009uL, false)
+        }
+        assertFailsWith<NotificationServiceException.NoteNotCached> {
+            service.setSiteFollowed(10_000_000_009uL, 7001uL, true)
+        }
+        assertEquals(0uL, service.pendingActionCount())
+        assertEquals(null, notificationServiceErrorUserMessage(error, null))
+        val refused = NotificationServiceException.ActionRefused(
+            NotificationNoteChange.LIKE_COMMENT,
+            ReaderException.MissingIds()
+        )
+        assertEquals("Your like was not added to this comment.", notificationServiceErrorUserMessage(refused, null))
     }
 }

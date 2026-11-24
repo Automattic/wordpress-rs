@@ -5859,11 +5859,12 @@ mod more_actions {
 
         let mut adopting = Box::pin(account.adopt_signed_out_tags());
         assert!(futures::poll!(adopting.as_mut()).is_pending());
-        assert_eq!(account.context.actions.waiting.lock().unwrap().len(), 3);
+        let queue = &account.context.actions.queue;
+        assert_eq!(queue.waiting.lock().unwrap().len(), 3);
         drop(adopting);
 
-        assert!(account.context.actions.waiting.lock().unwrap().is_empty());
-        assert!(account.context.actions.refusals.lock().unwrap().is_empty());
+        assert!(queue.waiting.lock().unwrap().is_empty());
+        assert!(queue.refusals.lock().unwrap().is_empty());
         assert_eq!(followed_keys(&account), ["art", "travel", "food"]);
         assert_eq!(account.pending_action_count().unwrap(), 3);
         assert!(signed_out.followed_tags().unwrap().is_empty());

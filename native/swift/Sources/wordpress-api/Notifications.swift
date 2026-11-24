@@ -46,3 +46,16 @@ extension NotificationTab {
         localizeNotificationTab(value: self, locale: wpLocaleResolve(langIds: languages))
     }
 }
+
+extension NotificationServiceError {
+    /// A message to show the user for the error, in their preferred language, or in English until
+    /// it's translated. `nil` for an error only a developer should see.
+    public var userMessage: String? {
+        userMessage(languages: Locale.preferredLanguages)
+    }
+
+    /// A message to show the user in the first of `languages` that has translations, or `nil`.
+    public func userMessage(languages: [String]) -> String? {
+        notificationServiceErrorUserMessage(error: self, locale: wpLocaleResolve(langIds: languages))
+    }
+}

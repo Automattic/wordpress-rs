@@ -84,6 +84,36 @@ struct NotificationServiceTests {
     #endif
 
     @Test
+    func aNoteThatIsNotCachedCannotBeLikedOrFollowed() async throws {
+        let cache = try openCache()
+        let service = try client.makeNotificationService(cache: cache, userID: 1)
+        let noteID: NotificationId = 10_000_000_001
+
+        try await expectNotCached(noteID) { try await service.setPostLiked(noteId: noteID, liked: true) }
+        try await expectNotCached(noteID) { try await service.setCommentLiked(noteId: noteID, liked: false) }
+        try await expectNotCached(noteID) {
+            try await service.setSiteFollowed(noteId: noteID, siteId: 7001, followed: true)
+        }
+        #expect(try service.pendingActionCount() == 0)
+        #expect(NotificationServiceError.NoteNotCached(noteId: noteID).userMessage == nil)
+        let refused = NotificationServiceError.ActionRefused(change: .followSite, error: .MissingIds)
+        #expect(refused.userMessage(languages: ["en-US"]) == "You are not subscribed to this site.")
+    }
+
+    /// Expects `action` to fail because note `noteID` isn't cached.
+    private func expectNotCached(
+        _ noteID: NotificationId,
+        _ action: () async throws -> ReaderActionOutcome
+    ) async throws {
+        do {
+            _ = try await action()
+            Issue.record("Expected the note not to be cached")
+        } catch NotificationServiceError.NoteNotCached(let missing) {
+            #expect(missing == noteID)
+        }
+    }
+
+    @Test
     func signingOutRemovesTheAccountsNotifications() throws {
         let cache = try openCache()
         _ = try client.makeNotificationService(cache: cache, userID: 1)

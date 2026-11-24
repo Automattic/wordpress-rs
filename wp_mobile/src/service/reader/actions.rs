@@ -8,21 +8,30 @@
 //! - When the server refuses, the cache goes back to what it showed before, the row goes, and the
 //!   tap's call returns the error.
 //! - When no answer comes, such as offline, or the server rejects the account's token, the row
-//!   stays and [`ReaderService::sync_actions`] sends it later. Turning something on or off twice
-//!   is the same as once, so sending again is safe.
+//!   stays and [`ReaderService::sync_actions`], or the notifications service's
+//!   `send_pending_changes`, sends it later. Turning something on or off twice is the same as
+//!   once, so sending again is safe.
+//!
+//! The rows are the account's, and so is the sending: an account has one [`ActionQueue`] per
+//! [`WpApiCache`], which every service of the account on that cache shares through an
+//! [`ActionContext`]. The notifications service likes and follows from a note through it too.
+//! Each row carries everything needed to send it except the client, so whichever service's call
+//! holds the lane sends every waiting row.
 //!
 //! A refresh that brings the server's older state for something still waiting doesn't undo the
 //! tap: what's waiting is shown again after every page is stored.
 
 use super::page_views::{ReaderPageViewChoice, ReaderPostLikeResult, ReaderPostLikedOutcome};
 use super::{ReaderContext, ReaderError, ReaderService};
+use crate::service::notifications::NoteActionTarget;
 use futures::lock::Mutex as AsyncMutex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use wp_api::comments::CommentId;
-use wp_api::prelude::{WpApiError, WpErrorCode};
+use wp_api::prelude::{WpApiClientDelegate, WpApiError, WpErrorCode};
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_blocks::{ReaderBlockedSite, ReaderBlockedSitesParams};
 use wp_api::wp_com::reader_comments::{
@@ -57,7 +66,7 @@ use wp_mobile_cache::repository::reader_sites::{
     ReaderSubscriptionRepository,
 };
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
-use wp_mobile_cache::{RowId, SqliteDbError};
+use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 
 /// How many blocked sites a page of the server's list is asked for.
 const BLOCKED_SITES_PAGE_SIZE: u32 = 100;
@@ -68,8 +77,9 @@ pub enum ReaderActionOutcome {
     /// The server has it.
     Synced,
     /// It's on this device, and goes to the server with a later
-    /// [`ReaderService::sync_actions`]: the device is offline, or no answer arrived. `reason`
-    /// says why.
+    /// [`ReaderService::sync_actions`] or
+    /// [`NotificationService::send_pending_changes`](crate::service::notifications::NotificationService::send_pending_changes):
+    /// the device is offline, or no answer arrived. `reason` says why.
     Pending { reason: String },
 }
 
@@ -77,8 +87,11 @@ pub enum ReaderActionOutcome {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub(crate) enum Action {
-    /// A post is seen, or not.
-    Seen { post: ReaderPostSaveIdentity },
+    /// A post is seen, or not, marked by the app `source`.
+    Seen {
+        post: ReaderPostSaveIdentity,
+        source: ReaderSeenSource,
+    },
     /// A site is blocked, or not.
     BlockSite { site_id: WpComSiteId },
     /// The user likes a post, or not.
@@ -90,6 +103,9 @@ pub(crate) enum Action {
         /// The address to follow: the site's, or the feed's.
         url: Option<String>,
         name: Option<String>,
+        /// Where the follow came from, sent with a follow: the Reader's app, or none from a note.
+        #[serde(default)]
+        source: Option<String>,
     },
     /// The user follows a tag, or not.
     FollowTag {
@@ -268,7 +284,7 @@ impl Action {
     /// that say.
     fn target(&self) -> Option<String> {
         match self {
-            Self::Seen { post } => reader_saved_key_for_post(post.clone())
+            Self::Seen { post, .. } => reader_saved_key_for_post(post.clone())
                 .map(|key| reader_saved_key_text(&key.normalized())),
             // Only a post of a WordPress.com or Jetpack site can be liked, or have its comments
             // followed, so a feed item has nothing to send them with.
@@ -300,6 +316,28 @@ impl Action {
         }
     }
 
+    /// What the action is about when a notification can show it: a like of a site's post or of a
+    /// comment, or a follow of a site by its ID.
+    fn note_target(&self) -> Option<NoteActionTarget> {
+        match self {
+            Self::LikePost { post } => post
+                .site_post()
+                .map(|(site_id, post_id)| NoteActionTarget::Post { site_id, post_id }),
+            Self::LikeComment {
+                site_id,
+                comment_id,
+            } => Some(NoteActionTarget::Comment {
+                site_id: *site_id,
+                comment_id: *comment_id,
+            }),
+            Self::Follow {
+                site_id: Some(site_id),
+                ..
+            } => Some(NoteActionTarget::Site { site_id: *site_id }),
+            _ => None,
+        }
+    }
+
     /// The post the action shows on, if the cache has it.
     fn post_row(
         post: &ReaderPostSaveIdentity,
@@ -324,7 +362,7 @@ impl Action {
                 None => Ok(None),
             };
         match self {
-            Self::Seen { post } => post_flag(post, ReaderPostFlag::IsSeen),
+            Self::Seen { post, .. } => post_flag(post, ReaderPostFlag::IsSeen),
             Self::LikePost { post } => post_flag(post, ReaderPostFlag::ILike),
             Self::SubscribeComments { post } => {
                 post_flag(post, ReaderPostFlag::IsSubscribedComments)
@@ -376,7 +414,7 @@ impl Action {
         on: bool,
     ) -> Result<(), SqliteDbError> {
         match self {
-            Self::Seen { post } => {
+            Self::Seen { post, .. } => {
                 if let Some(row) = Self::post_row(post, executor, owner)? {
                     ReaderPostRepository::set_flag(executor, row, ReaderPostFlag::IsSeen, on)?;
                 }
@@ -437,6 +475,7 @@ impl Action {
                 feed_id,
                 url,
                 name,
+                ..
             } => {
                 ReaderPostRepository::set_following(executor, owner, *site_id, *feed_id, on)?;
                 ReaderSiteRepository::set_following(executor, owner, *site_id, *feed_id, on)?;
@@ -538,7 +577,7 @@ impl Action {
         was: Option<bool>,
         on: bool,
     ) -> Result<(), SqliteDbError> {
-        let Self::Seen { post } = self else {
+        let Self::Seen { post, .. } = self else {
             return Ok(());
         };
         if was != Some(!on) {
@@ -660,14 +699,11 @@ impl Action {
     }
 
     /// Asks the server to turn it on or off.
-    async fn send(&self, context: &ReaderContext, on: bool) -> Result<Confirmation, ReaderError> {
+    async fn send(&self, context: &ActionContext, on: bool) -> Result<Confirmation, ReaderError> {
         let mut confirmation = Confirmation::default();
         match self {
-            Self::Seen { post } => {
-                let source = match context.source {
-                    ReaderSavedSource::Android => ReaderSeenSource::Android,
-                    ReaderSavedSource::Ios => ReaderSeenSource::Ios,
-                };
+            Self::Seen { post, source } => {
+                let source = *source;
                 let seen = context.client.reader_seen();
                 // An RSS post is marked by its feed's IDs, and any other by its site's.
                 let marked = if let (true, Some(feed_id)) = (post.is_feed_item(), post.feed_id) {
@@ -727,6 +763,7 @@ impl Action {
                 site_id,
                 feed_id,
                 url,
+                source,
                 ..
             } => {
                 let subscriptions = context.client.reader_subscriptions();
@@ -748,7 +785,7 @@ impl Action {
                 if on {
                     let params = ReaderFollowUrlParams {
                         url: url.ok_or(ReaderError::MissingIds)?,
-                        source: Some(source_name(context.source).to_string()),
+                        source: source.clone(),
                     };
                     let answer = subscriptions.follow_url(&params).await?.data;
                     if !answer.subscribed {
@@ -953,6 +990,21 @@ pub(crate) fn show_pending(
     Ok(())
 }
 
+/// The likes and follows waiting to be sent that a notification can show, with what the user wants
+/// each to be.
+pub(crate) fn waiting_note_actions(
+    executor: &impl QueryExecutor,
+    owner: RowId,
+) -> Result<Vec<(NoteActionTarget, bool)>, SqliteDbError> {
+    Ok(ReaderActionRepository::select_all(executor, owner)?
+        .into_iter()
+        .filter_map(|row| {
+            let action = serde_json::from_str::<Action>(&row.payload).ok()?;
+            Some((action.note_target()?, row.wanted))
+        })
+        .collect())
+}
+
 /// Whether the tags a follow or unfollow answered with have the tag `id`, `slug`. `None` when a
 /// tag the answer couldn't read could be it.
 fn tag_listed(
@@ -977,20 +1029,23 @@ fn tag_listed(
 /// A target a tap waits on: its action's kind and target.
 type Target = (i64, String);
 
-/// The sending of what the user turned on or off, one request at a time.
+/// The sending of what the user turned on or off, one request at a time. An account has one in
+/// the process, whichever of its services and [`WpApiCache`] objects of its database exist: see
+/// [`WpApiCache::shared_state`].
 #[derive(Default)]
 pub(crate) struct ActionQueue {
-    /// Held while rows are sent, so they go in order; while the service's other changes are sent
-    /// (a site's email frequency, a comment), so no two of its changes overlap; and by the
-    /// refreshes whose reads must not overlap one: see [`ReaderService::set_tag_followed`],
-    /// [`ReaderService::refresh_blocked_sites`] and [`ReaderService::refresh_menu`].
+    /// Held while rows are sent, so they go in order; while the Reader's other changes are sent
+    /// (a site's email frequency, a comment), so no two of the account's changes overlap; and by
+    /// the reads that must not overlap one: see [`ReaderService::set_tag_followed`],
+    /// [`ReaderService::refresh_blocked_sites`], [`ReaderService::refresh_menu`], and the
+    /// notifications service's downloads of whole notes.
     pub(super) lane: AsyncMutex<()>,
     /// The targets taps are waiting on, and how many taps wait on each.
     pub(super) waiting: Mutex<HashMap<Target, usize>>,
     /// Why the server refused a target a tap is waiting on, until the tap takes it. The call that
     /// sends a row isn't always its tap's: whichever call holds the lane sends every row.
     pub(super) refusals: Mutex<HashMap<Target, ReaderError>>,
-    /// Blocks and unblocks the server took from this service, by site, until the server's list
+    /// Blocks and unblocks the server took from this queue, by site, until the server's list
     /// of blocked sites agrees: whether the site was blocked. See
     /// [`ReaderService::refresh_blocked_sites`].
     confirmed_blocks: Mutex<HashMap<WpComSiteId, bool>>,
@@ -1032,7 +1087,45 @@ impl Drop for Waiting<'_> {
     }
 }
 
-impl ReaderContext {
+/// What the queue's code runs on: the account, and its one [`ActionQueue`]. Each service of the
+/// account has one, with its own client.
+pub(crate) struct ActionContext {
+    pub(crate) client: WpComApiClient,
+    pub(crate) cache: Arc<WpApiCache>,
+    pub(crate) owner: ReaderOwner,
+    /// The owner's row in the cache.
+    pub(crate) owner_row: RowId,
+    /// The account's queue, which every service of the account shares.
+    pub(crate) queue: Arc<ActionQueue>,
+}
+
+impl ActionContext {
+    /// Sends with a client made from `delegate`, with no language: no action's answer depends on
+    /// one.
+    pub(crate) fn new(
+        delegate: WpApiClientDelegate,
+        cache: Arc<WpApiCache>,
+        owner: ReaderOwner,
+        owner_row: RowId,
+    ) -> Self {
+        Self {
+            client: WpComApiClient::new(WpApiClientDelegate {
+                language_provider: None,
+                ..delegate
+            }),
+            queue: cache.shared_state(owner_row),
+            cache,
+            owner,
+            owner_row,
+        }
+    }
+
+    /// Waits until no change of the account's is being sent, and keeps any from being sent until
+    /// the guard is dropped.
+    pub(crate) async fn hold_lane(&self) -> futures::lock::MutexGuard<'_, ()> {
+        self.queue.lane.lock().await
+    }
+
     /// Turns something on or off: shows it, then sends it with everything else that's waiting.
     pub(crate) async fn set_action(
         &self,
@@ -1051,7 +1144,7 @@ impl ReaderContext {
         let _waiting = self.wait_on(target.clone());
 
         let unsent = {
-            let _lane = self.actions.lane.lock().await;
+            let _lane = self.queue.lane.lock().await;
             self.send_pending_actions().await?
         };
         if let Some(error) = self.take_refusal(&target) {
@@ -1104,17 +1197,17 @@ impl ReaderContext {
     /// [`Self::take_refusal`].
     fn wait_on(&self, target: Target) -> Waiting<'_> {
         // A refusal from before this tap was of an older one.
-        self.actions
+        self.queue
             .refusals
             .lock()
             .expect("refusals lock poisoned")
             .remove(&target);
-        Waiting::new(&self.actions, target)
+        Waiting::new(&self.queue, target)
     }
 
     /// Takes why the server refused `target`, if it did while it was waited on.
     fn take_refusal(&self, target: &Target) -> Option<ReaderError> {
-        self.actions
+        self.queue
             .refusals
             .lock()
             .expect("refusals lock poisoned")
@@ -1123,7 +1216,7 @@ impl ReaderContext {
 
     /// Sends every waiting row, oldest tap first. Stops at the first that gets no answer, since
     /// the next would fare no better. Returns why it stopped, if it did. Call it holding the lane.
-    async fn send_pending_actions(&self) -> Result<Option<String>, SqliteDbError> {
+    pub(crate) async fn send_pending_actions(&self) -> Result<Option<String>, SqliteDbError> {
         // Rows sent this round, as they were when sent. A row tapped since is sent again.
         let mut sent: HashSet<(RowId, i64)> = HashSet::new();
         loop {
@@ -1169,7 +1262,7 @@ impl ReaderContext {
     }
 
     /// The sites a list of blocked sites from the server is stale about: a block or unblock the
-    /// server took from this service that the list disagrees with, and that `read/sites/{id}`
+    /// server took from this queue that the list disagrees with, and that `read/sites/{id}`
     /// says still holds. What the cache has of them is kept. A change the list agrees with, or
     /// that the site says no longer holds, is forgotten. Call it holding the lane, so no change is
     /// sent meanwhile.
@@ -1178,7 +1271,7 @@ impl ReaderContext {
         listed: &[DbReaderBlockedSite],
     ) -> Result<Vec<WpComSiteId>, ReaderError> {
         let confirmed: Vec<(WpComSiteId, bool)> = self
-            .actions
+            .queue
             .confirmed_blocks
             .lock()
             .expect("confirmed blocks lock poisoned")
@@ -1215,7 +1308,7 @@ impl ReaderContext {
             if still_holds {
                 stale.push(site_id);
             } else {
-                self.actions
+                self.queue
                     .confirmed_blocks
                     .lock()
                     .expect("confirmed blocks lock poisoned")
@@ -1245,6 +1338,16 @@ impl ReaderContext {
         let finished = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             let finished = ReaderActionRepository::finish(&transaction, row.row_id, row.seq)?;
+            // The server has what was sent, so the account's notifications about the same post,
+            // comment or site keep it once the row goes. A newer tap still waiting shows over it.
+            if let (Ok(_), Some(target)) = (&answer, action.note_target()) {
+                crate::service::notifications::store_note_action(
+                    &transaction,
+                    self.owner_row,
+                    &target,
+                    row.wanted,
+                )?;
+            }
             match (&answer, finished) {
                 // Taken, with no tap since: the row is done, and what the server said is kept.
                 (Ok(confirmation), true) => {
@@ -1290,7 +1393,7 @@ impl ReaderContext {
         })?;
         let answer = answer.map_err(|(_, error)| error);
         if let (Ok(_), Action::BlockSite { site_id }) = (&answer, action) {
-            self.actions
+            self.queue
                 .confirmed_blocks
                 .lock()
                 .expect("confirmed blocks lock poisoned")
@@ -1298,13 +1401,13 @@ impl ReaderContext {
         }
         if let (Err(error), true) = (answer, finished) {
             let is_waited_on = self
-                .actions
+                .queue
                 .waiting
                 .lock()
                 .expect("waiting lock poisoned")
                 .contains_key(&target);
             if is_waited_on {
-                self.actions
+                self.queue
                     .refusals
                     .lock()
                     .expect("refusals lock poisoned")
@@ -1314,6 +1417,58 @@ impl ReaderContext {
             }
         }
         Ok(())
+    }
+}
+
+impl ActionContext {
+    /// Likes or follows `target` for a notification, as a tap in the Reader does: it shows on
+    /// what the Reader caches of it, and goes in the account's queue. A follow is sent by `url`
+    /// when there is one, with no source, as the web notifications panel sends it, and lists
+    /// `name` until the server answers. Likes count no page view.
+    pub(crate) async fn set_note_action(
+        &self,
+        target: NoteActionTarget,
+        url: Option<String>,
+        name: Option<String>,
+        on: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        let action = match target {
+            NoteActionTarget::Post { site_id, post_id } => Action::LikePost {
+                post: ReaderPostSaveIdentity {
+                    id: u64::try_from(post_id.0).map_err(|_| ReaderError::MissingIds)?,
+                    site_id: Some(site_id),
+                    feed_id: None,
+                    feed_item_id: None,
+                    is_external: false,
+                    url: None,
+                },
+            },
+            NoteActionTarget::Comment {
+                site_id,
+                comment_id,
+            } => Action::LikeComment {
+                site_id,
+                comment_id,
+            },
+            NoteActionTarget::Site { site_id } => Action::Follow {
+                site_id: Some(site_id),
+                feed_id: None,
+                url: url.filter(|url| !url.is_empty()),
+                name,
+                source: None,
+            },
+        };
+        self.set_action(action, on).await
+    }
+}
+
+impl ReaderContext {
+    /// The app, as a post marked seen names it.
+    pub(super) fn seen_source(&self) -> ReaderSeenSource {
+        match self.source {
+            ReaderSavedSource::Android => ReaderSeenSource::Android,
+            ReaderSavedSource::Ios => ReaderSeenSource::Ios,
+        }
     }
 }
 
@@ -1358,7 +1513,11 @@ impl ReaderService {
         post: ReaderPostSaveIdentity,
         seen: bool,
     ) -> Result<ReaderActionOutcome, ReaderError> {
-        self.context.set_action(Action::Seen { post }, seen).await
+        let action = Action::Seen {
+            post,
+            source: self.context.seen_source(),
+        };
+        self.context.actions.set_action(action, seen).await
     }
 
     /// Blocks or unblocks a site. The Reader's streams leave out a blocked site's posts, straight
@@ -1383,6 +1542,7 @@ impl ReaderService {
         blocked: bool,
     ) -> Result<ReaderActionOutcome, ReaderError> {
         self.context
+            .actions
             .set_action(Action::BlockSite { site_id }, blocked)
             .await
     }
@@ -1421,14 +1581,14 @@ impl ReaderService {
     ///   on their way during an unblock (3 tries). One live run did get a stale list with no other
     ///   read of the list found to overlap the unblock, so not every cause is known.
     ///
-    /// So this doesn't read the list while a block or unblock of this service's is being sent,
-    /// and doesn't send one while it reads. And when the list disagrees with a block or unblock
-    /// the server took from this service, the site is asked about by `read/sites/{id}`, and its
-    /// `is_blocked` decides: what the cache has is kept when it agrees with that change, and the
-    /// list is taken when it doesn't (blocked or unblocked elsewhere since). A site that can't be
-    /// asked about, such as a deleted one (410), is taken as the list has it. A site is asked
-    /// about only until the list agrees with the change, and only by the service that made it: a
-    /// new service, such as after a restart, takes the list as it is.
+    /// So this doesn't read the list while a block or unblock of the account's is being sent from
+    /// this cache, and doesn't send one while it reads. And when the list disagrees with a block
+    /// or unblock the server took from this cache, the site is asked about by `read/sites/{id}`,
+    /// and its `is_blocked` decides: what the cache has is kept when it agrees with that change,
+    /// and the list is taken when it doesn't (blocked or unblocked elsewhere since). A site that
+    /// can't be asked about, such as a deleted one (410), is taken as the list has it. A site is
+    /// asked about only until the list agrees with the change, and only while the `WpApiCache`
+    /// object that sent it lives: after a restart, the list is taken as it is.
     ///
     /// The site is asked for whole, with no `fields`, as [`Self::fetch_site`] asks: the server
     /// keeps an answer for each value of `fields`, and a kept answer is what the check gets
@@ -1440,10 +1600,10 @@ impl ReaderService {
         if context.owner == ReaderOwner::SignedOut {
             return Err(ReaderError::NeedsAccount);
         }
-        // Held from the first read to the store, so no block or unblock of this service's is sent
+        // Held from the first read to the store, so no block or unblock of the account's is sent
         // while the list is being read. It also keeps a list read before an unblock from being
         // stored after the unblock is confirmed, which would block the site again here.
-        let _lane = context.actions.lane.lock().await;
+        let _lane = context.actions.hold_lane().await;
         let mut sites = Vec::new();
         let mut page = 1;
         loop {
@@ -1468,7 +1628,10 @@ impl ReaderService {
             }
             page += 1;
         }
-        let kept = context.sites_the_list_is_stale_about(&sites).await?;
+        let kept = context
+            .actions
+            .sites_the_list_is_stale_about(&sites)
+            .await?;
         context.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             let mut keep: Vec<WpComSiteId> =
@@ -1521,8 +1684,8 @@ impl ReaderService {
             return Ok(0);
         }
         {
-            let _lane = context.actions.lane.lock().await;
-            context.send_pending_actions().await?;
+            let _lane = context.actions.hold_lane().await;
+            context.actions.send_pending_actions().await?;
         }
         self.pending_action_count()
     }
@@ -1629,7 +1792,7 @@ impl ReaderService {
             None => None,
         };
         let (like, page_view) = futures::join!(
-            context.set_action(Action::LikePost { post }, liked),
+            context.actions.set_action(Action::LikePost { post }, liked),
             context.like_page_view(cached.as_ref(), liked, page_view)
         );
         let like = match like {
@@ -1657,8 +1820,9 @@ impl ReaderService {
             feed_id: target.feed_id.filter(|feed| feed.0 != 0),
             url: target.url,
             name: target.name,
+            source: Some(source_name(self.context.source).to_string()),
         };
-        self.context.set_action(action, followed).await
+        self.context.actions.set_action(action, followed).await
     }
 
     /// Follows or unfollows a tag. `title` is the tag's name, to show with it. It shows in
@@ -1697,11 +1861,12 @@ impl ReaderService {
     /// dropped it. No read says otherwise once the server has dropped a change, so nothing else
     /// is checked.
     ///
-    /// This service sends its own changes one at a time, in one lane: everything it turns on or
-    /// off (tags, likes, seen, follows, blocks, a comment's like, comment subscriptions and a
-    /// site's delivery settings), [`Self::set_post_email_frequency`], and the comments posted
-    /// through [`Self::comments`]. So a tag change of this service's never overlaps another of
-    /// its changes, and [`Self::refresh_menu`] doesn't read the menu while one is being sent.
+    /// The account's changes are sent one at a time, in one lane, whichever of the account's
+    /// services made them: everything turned on or off (tags, likes, seen, follows, blocks, a
+    /// comment's like, comment subscriptions and a site's delivery settings, including likes and
+    /// follows made from a notification), [`Self::set_post_email_frequency`], and the comments
+    /// posted through [`Self::comments`]. So a tag change never overlaps another of the account's
+    /// changes, and [`Self::refresh_menu`] doesn't read the menu while one is being sent.
     /// Saves aren't in that lane ([`Self::saved`] sends them in its own), nor are page views,
     /// which count a view rather than change the account; neither was measured beside a tag
     /// follow. Nothing here holds back another device or app signed in to the account.
@@ -1725,6 +1890,7 @@ impl ReaderService {
             return Ok(only_on_this_device(followed));
         }
         context
+            .actions
             .set_action(Action::FollowTag { slug, title }, followed)
             .await
     }
@@ -1765,7 +1931,7 @@ impl ReaderService {
                     slug: slug.clone(),
                     title: tag.title.clone(),
                 };
-                let target = context.record_action(&transaction, &action, true)?;
+                let target = context.actions.record_action(&transaction, &action, true)?;
                 if !tags.iter().any(|(listed, _, _)| *listed == target) {
                     tags.push((target, slug, tag.title));
                 }
@@ -1782,16 +1948,16 @@ impl ReaderService {
         })?;
         let _waiting: Vec<_> = tags
             .iter()
-            .map(|(target, _, _)| context.wait_on(target.clone()))
+            .map(|(target, _, _)| context.actions.wait_on(target.clone()))
             .collect();
 
         {
-            let _lane = context.actions.lane.lock().await;
-            context.send_pending_actions().await?;
+            let _lane = context.actions.hold_lane().await;
+            context.actions.send_pending_actions().await?;
         }
         let mut report = ReaderTagAdoptionReport::default();
         for (target, slug, title) in tags {
-            match context.take_refusal(&target) {
+            match context.actions.take_refusal(&target) {
                 Some(error) => report.refused.push(ReaderRefusedTag { slug, title, error }),
                 // Followed, or waiting to be sent.
                 None => report.adopted += 1,
@@ -1808,6 +1974,7 @@ impl ReaderService {
         liked: bool,
     ) -> Result<ReaderActionOutcome, ReaderError> {
         self.context
+            .actions
             .set_action(
                 Action::LikeComment {
                     site_id,
@@ -1840,6 +2007,7 @@ impl ReaderService {
         subscribed: bool,
     ) -> Result<ReaderActionOutcome, ReaderError> {
         self.context
+            .actions
             .set_action(Action::SubscribeComments { post }, subscribed)
             .await
     }
@@ -1859,6 +2027,7 @@ impl ReaderService {
         enabled: bool,
     ) -> Result<ReaderActionOutcome, ReaderError> {
         self.context
+            .actions
             .set_action(Action::CommentNotifications { post }, enabled)
             .await
     }
@@ -1900,7 +2069,7 @@ impl ReaderService {
 
     /// Sets how often a followed site's new posts are emailed. Unlike the on/off settings, this
     /// one isn't kept to send later: it returns the error if it can't be sent now. Needs an
-    /// account. It's sent once no other change of this service's is being sent.
+    /// account. It's sent once no other change of the account's is being sent.
     pub async fn set_post_email_frequency(
         &self,
         site_id: WpComSiteId,
@@ -1916,9 +2085,9 @@ impl ReaderService {
             delivery_frequency: frequency.clone(),
             track_source: None,
         };
-        // Sent in the lane, so it doesn't overlap another change of this service's: see
+        // Sent in the lane, so it doesn't overlap another change of the account's: see
         // `Self::set_tag_followed`.
-        let _lane = context.actions.lane.lock().await;
+        let _lane = context.actions.hold_lane().await;
         context
             .client
             .reader_subscriptions()
@@ -1944,6 +2113,7 @@ impl ReaderService {
         enabled: bool,
     ) -> Result<ReaderActionOutcome, ReaderError> {
         self.context
+            .actions
             .set_action(Action::Delivery { site_id, setting }, enabled)
             .await
     }
