@@ -5,15 +5,14 @@
 The most common task is showing a tab's cached notes, then syncing its newest:
 
 ```swift
-let reader = try client.makeReaderService(cache: cache, owner: .account(userId: account.userID), savedSource: .ios)
-let service = try client.makeNotificationService(reader: reader)
+let service = try client.makeNotificationService(cache: cache, userID: account.userID)
 service.setLanguage(language: .english)
 
 let notes = try service.loadTabNotes(tab: .unread)   // show these at once
 let result = try await service.syncTab(tab: .unread)  // then bring them up to date
 ```
 
-In Kotlin it's `client.makeNotificationService(reader)`, and in Rust `NotificationService::new(delegate, reader)`. The service uses the Reader service's cache and account, and sends a note's likes and follows through the Reader's queue. So pass the app's one `ReaderService` for the account: an app that shows no Reader still makes one, which sends nothing until it's used. The signed-out reader's is refused with `ReaderSignedOut`. The cache's migrations must have run. Create one service per account and share it.
+In Kotlin it's `client.makeNotificationService(cache, userId)`, and in Rust `NotificationService::new(delegate, cache, user_id)`. The cache's migrations must have run. Create one service per account and share it. It needs no Reader service: an app that shows notifications and no Reader makes only this one.
 
 ## Tabs
 
@@ -60,17 +59,17 @@ Each change shows in the cache at once, and observers hear of it through `is_rel
 | `Unchanged` | Nothing to send: the notes already show that way, or the seen time isn't newer. | No change |
 | An error | The server refused it for good: an answer in the 400s other than 401, 408 or 429, or a success that says it didn't make the change (`ChangeNotMade`). The change is dropped. | The notes as the server has them |
 
-Changes that wait are sent by `send_pending_changes()`, which returns how many still wait, and by the next change of any kind. Call it at launch, when the app comes to the foreground, and when the device is back online. `pending_change_count()` counts them. A change refused when it's sent later is logged, and the notes go back to the server's state.
+Changes that wait are sent by `send_pending_changes()` and by the next change of any kind. Call it at launch, when the app comes to the foreground, and when the device is back online. It also sends what waits in the account's queue of likes and follows (see the next section), and returns how many of both still wait. `pending_change_count()` counts the read and seen changes only. `pending_action_count()` counts that queue, which also holds what the account's Reader service queued, such as a post marked seen. A change refused when it's sent later is logged, and the notes go back to the server's state.
 
 ## Liking and following from a note
 
 - `set_post_liked(note_id, liked)` likes or unlikes the post the note is about, and `set_comment_liked(note_id, liked)` its comment. The note needs a body block with the `like-post` or `like-comment` action, and the post's or comment's IDs in its `meta.ids`, as the WordPress apps and the web panel read them.
-- `set_site_followed(note_id, site_id, followed)` follows or unfollows a site the note offers to follow: the site of a body block with the `follow` action, such as the layout's `NotificationFollowOffer.site_id`. A follow is sent by that block's site address.
+- `set_site_followed(note_id, site_id, followed)` follows or unfollows a site the note offers to follow: the site of a body block with the `follow` action, such as the layout's `NotificationFollowOffer.site_id`. A follow is sent by that block's site address, with no `source`, as the web panel sends it.
 
-Each goes in the account's Reader action queue, the same one `ReaderService.set_post_liked`, `set_comment_liked` and `set_followed` use. So a like made from a note and one made in the Reader of the same post are one like: one change waiting, one request.
+Each goes in the account's queue of likes and follows in the cache, the same one `ReaderService.set_post_liked`, `set_comment_liked` and `set_followed` use. An account has one such queue per `WpApiCache` object, whichever services exist. So a like made from a note and one made in the Reader of the same post are one like: one change waiting, one request. Either service sends what waits: `send_pending_changes()` here, and `sync_actions()` on the Reader service.
 
 - **It shows at once.** Every cached note about the same post, comment or site shows the new state in `load_notes`, `load_tab_notes` and the note's layout, and so does what the Reader caches of it. A like or follow made in the Reader shows on the notes too.
-- **Offline, it waits.** The call returns `Pending`, the notes keep showing it, and `ReaderService.sync_actions()` sends it later. Call that at launch, when the app comes to the foreground, and when the device is back online.
+- **Offline, it waits.** The call returns `Pending`, the notes keep showing it, and `send_pending_changes()` sends it later.
 - **Refused, it goes back.** The notes show the server's state again, and the call fails with `ActionRefused`. `notification_service_error_user_message(error, locale)` gives a sentence to show the user, such as "Your like was not added to this post." (Swift: `error.userMessage`). Other errors return `nil`: they're for developers.
 - **Taken, it stays.** The stored notes keep the new state after it's sent, until a sync brings the server's own copy.
 
@@ -87,9 +86,10 @@ Both change the cache, so `is_relevant_update` says to reload. With no push or s
 
 ## Traps
 
-- **A sync doesn't undo a change that waits.** Until a change reaches the server, the server still has the old state, and a sync stores it. The cached lists show the waiting change over it. Changes and syncs take turns, so a change is sent after a sync that's running, and the next sync sees the server after it. A sync downloads no note while the Reader sends a like or follow, so it can't store a copy from before one the server just took.
+- **A sync doesn't undo a change that waits.** Until a change reaches the server, the server still has the old state, and a sync stores it. The cached lists show the waiting change over it. Changes and syncs take turns, so a change is sent after a sync that's running, and the next sync sees the server after it. A sync downloads no note while a like or follow is being sent, so it can't store a copy from before one the server just took.
 - **The seen time only moves forward.** `mark_seen` ignores a time that isn't after the newest the service knows, and a seen time that waits is dropped, unsent, if a sync brings a newer one from another device.
 - **Marking a note gives it a new hash.** The next sync downloads it again, as it does a note another client fetched.
+- **Use one `WpApiCache` object for the account.** The queue of likes and follows lives in memory in that object. Two objects over the same file each have their own, and could send one change twice.
 - **Set the language once, and keep it.** `set_language` sets the language every request is sent in, changes included, as its WordPress.com locale (`en`, `pt-br`). A request in a different language from the account's previous one changes every note's hash, so the sync after a change downloads every note again. `None` sends English. The delegate's `language_provider` isn't used.
 - **Other clients make the service download notes again.** Fetching a note whole gives it a new hash. So when the web or another app fetches a note between two syncs, the next sync downloads it, though nothing changed. That's expected.
 - **The Unread tab never removes a note.** A note missing from its list may only have been read. The service downloads it again, which brings whether it was read. One that doesn't come stays until the All tab's sync, which lists every note.

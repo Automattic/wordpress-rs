@@ -1,7 +1,9 @@
 //! Liking the post or comment a note is about, and following a site a note offers.
 //!
-//! These go through the account's Reader action queue, so a like made from a note and a like
-//! made in the Reader of the same post are one like, with one row waiting and one request.
+//! These go in the account's queue of likes and follows, the one the account's Reader service
+//! uses on the same cache, so a like made from a note and a like made in the Reader of the same
+//! post are one like, with one row waiting and one request. No Reader service is needed: either
+//! service sends what waits.
 //!
 //! - While a like or follow waits to be sent, whoever made it, every cached note about the same
 //!   post, comment or site shows it: [`NotificationService::load_notes`] puts it over the note's
@@ -232,8 +234,8 @@ fn blocks_with<'a>(
 #[uniffi::export]
 impl NotificationService {
     /// Likes or unlikes the post the note is about. Every cached note about the post shows it at
-    /// once, and so does the Reader's cached post. It's sent with the Reader's other changes:
-    /// see [`crate::service::reader::ReaderService::sync_actions`] for one that can't be sent yet.
+    /// once, and so does the Reader's cached post. One that can't be sent yet waits in the
+    /// account's queue: [`Self::send_pending_changes`] sends it.
     ///
     /// Returns [`ReaderActionOutcome::Pending`] when it couldn't be sent yet. Fails with
     /// [`NotificationServiceError::NoteNotCached`] or
@@ -346,7 +348,7 @@ impl NotificationService {
         name: Option<String>,
         on: bool,
     ) -> Result<ReaderActionOutcome, NotificationServiceError> {
-        match self.reader.set_note_action(target, url, name, on).await {
+        match self.actions.set_note_action(target, url, name, on).await {
             Ok(outcome) => Ok(outcome),
             Err(ReaderError::Database(error)) => Err(NotificationServiceError::Database(error)),
             Err(error) => Err(NotificationServiceError::ActionRefused {

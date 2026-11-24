@@ -400,9 +400,9 @@ impl ReaderCommentsCollection {
             answered: false,
         };
         let sent = {
-            // Sent in the lane the service's other changes are sent in, so it doesn't overlap
+            // Sent in the lane the account's other changes are sent in, so it doesn't overlap
             // one: see `ReaderService::set_tag_followed`.
-            let _lane = self.context.actions.lane.lock().await;
+            let _lane = self.context.actions.hold_lane().await;
             match written.parent_id {
                 Some(parent) => comments
                     .new_reply(&self.site_id, &parent, &params)

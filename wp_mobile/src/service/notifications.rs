@@ -45,10 +45,12 @@ use wp_mobile_cache::repository::notifications::{
     DbKnownHash, DbNotificationFilter, DbNotificationSyncState, DbNotificationTabState,
     DbNotificationWindow, NotificationRepository, UNDATED_BEFORE,
 };
-use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
+use wp_mobile_cache::repository::wordpress_com_accounts::{
+    ReaderOwner, WordPressComAccountRepository,
+};
 use wp_mobile_cache::{DbTable, RowId, SqliteDbError, UpdateHook, WpApiCache};
 
-use crate::service::reader::{ReaderError, ReaderService};
+use crate::service::reader::{ActionContext, ReaderError};
 
 /// How many of the newest notes a sync checks, and how many notes an older page has.
 const PAGE_SIZE: u32 = 100;
@@ -59,7 +61,7 @@ const MAX_PAGE_SIZE: u32 = 200;
 /// How many notes are downloaded whole in one request.
 const DOWNLOAD_AT_A_TIME: usize = 100;
 
-/// The tables the cached notes and their state are read from. The Reader's waiting likes and
+/// The tables the cached notes and their state are read from. The account's waiting likes and
 /// follows show on the notes.
 const NOTIFICATION_TABLES: [DbTable; 6] = [
     DbTable::Notifications,
@@ -89,13 +91,6 @@ pub enum NotificationServiceError {
     /// has.
     #[error("The server answered without making the change.")]
     ChangeNotMade,
-
-    /// The Reader service the notifications service was made with is the signed-out reader's.
-    /// Notifications belong to an account.
-    #[error(
-        "The notifications service needs an account's Reader service, not the signed-out reader's."
-    )]
-    ReaderSignedOut,
 
     /// The note isn't in the cache, so what it's about isn't known. Nothing was sent.
     #[error("Notification {note_id} isn't in the cache.")]
@@ -208,9 +203,10 @@ pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 /// change the cache at once, then send the change. One that can't be sent yet is kept, and sent by
 /// [`Self::send_pending_changes`] or the next change. Syncs send only GET requests.
 ///
-/// [`Self::set_post_liked`], [`Self::set_comment_liked`] and [`Self::set_site_followed`] go through
-/// the account's [`ReaderService`], the one the service is made with, so they're one queue with
-/// the Reader's likes and follows: [`ReaderService::sync_actions`] sends the ones that wait.
+/// [`Self::set_post_liked`], [`Self::set_comment_liked`] and [`Self::set_site_followed`] go in the
+/// account's queue of likes and follows on this cache, which the account's
+/// [`crate::service::reader::ReaderService`] uses too: a like from a note and one in the Reader are
+/// one like, and either service sends what waits. [`Self::send_pending_changes`] sends them.
 ///
 /// Which notes the API sends can depend on the request's `User-Agent`, which the delegate's
 /// request executor sets, not this service.
@@ -219,8 +215,8 @@ pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 #[derive(uniffi::Object)]
 pub struct NotificationService {
     client: WpComApiClient,
-    /// The account's Reader, whose action queue likes and follows go through.
-    reader: Arc<ReaderService>,
+    /// The account's queue of likes and follows, shared with its Reader service on this cache.
+    actions: ActionContext,
     /// The client changes are sent with. It sends the service's language in the address, as
     /// every other request does in its query.
     write_client: WpComApiClient,
@@ -230,7 +226,8 @@ pub struct NotificationService {
     account: RowId,
     language: Arc<Mutex<Option<WPComLanguage>>>,
     /// Held while a sync, a page of older notes or the sending of changes runs, so they take
-    /// turns, and a sync never sees the server halfway through a change.
+    /// turns, and a sync never sees the server halfway through a change. A call that holds it and
+    /// the account's action lane too takes this one first.
     lane: AsyncMutex<()>,
     /// The changes calls wait on, and the server's answer to each once it comes.
     answers: changes::Answers,
@@ -241,16 +238,14 @@ pub struct NotificationService {
 
 #[uniffi::export]
 impl NotificationService {
-    /// Uses what the cache has for `reader`'s account, in `reader`'s cache, which must have had
-    /// its migrations run. Pass the app's one Reader service for the account: an app that shows
-    /// no Reader still makes one, as the queue for likes and follows. Fails with
-    /// [`NotificationServiceError::ReaderSignedOut`] for the signed-out reader's.
+    /// Uses what the cache has for the account. `cache` must have had its migrations run.
     #[uniffi::constructor]
     pub fn new(
         delegate: WpApiClientDelegate,
-        reader: Arc<ReaderService>,
+        cache: Arc<WpApiCache>,
+        user_id: WpComUserId,
     ) -> Result<Self, NotificationServiceError> {
-        Self::with_clock(delegate, reader, Arc::new(SystemTime::now))
+        Self::with_clock(delegate, cache, user_id, Arc::new(SystemTime::now))
     }
 
     /// The account the notifications belong to.
@@ -395,7 +390,7 @@ impl NotificationService {
     ) -> Result<NotificationRefreshResult, NotificationServiceError> {
         let _lane = self.lane.lock().await;
         // See `download`.
-        let _actions = self.reader.hold_action_lane().await;
+        let _actions = self.actions.hold_lane().await;
         let page = self.fetch_whole(&[note_id]).await?;
         Ok(self.cache.execute(|connection| {
             if let Some(note) = page.notes.iter().find(|note| note.note.id == note_id) {
@@ -520,16 +515,21 @@ impl NotificationService {
 impl NotificationService {
     pub(crate) fn with_clock(
         delegate: WpApiClientDelegate,
-        reader: Arc<ReaderService>,
+        cache: Arc<WpApiCache>,
+        user_id: WpComUserId,
         clock: Clock,
     ) -> Result<Self, NotificationServiceError> {
-        let ReaderOwner::Account { user_id } = reader.owner() else {
-            return Err(NotificationServiceError::ReaderSignedOut);
-        };
-        let cache = reader.cache();
-        let account = reader.owner_row();
+        let account = cache.execute(|connection| {
+            WordPressComAccountRepository::get_or_create(connection, user_id)
+        })?;
         let language = Arc::new(Mutex::default());
         Ok(Self {
+            actions: ActionContext::new(
+                delegate.clone(),
+                cache.clone(),
+                ReaderOwner::Account { user_id },
+                account,
+            ),
             // The service sends its own language: see `set_language`.
             client: WpComApiClient::new(WpApiClientDelegate {
                 language_provider: None,
@@ -539,7 +539,6 @@ impl NotificationService {
                 language_provider: Some(Arc::new(changes::ServiceLanguage(language.clone()))),
                 ..delegate
             }),
-            reader,
             cache,
             user_id,
             account,
@@ -746,7 +745,7 @@ impl NotificationService {
     ) -> Result<(u64, u64), NotificationServiceError> {
         // No like or follow is sent from fetching the notes to storing them: one the server took
         // meanwhile would be stored on the notes, and then the older copy stored over it.
-        let _actions = self.reader.hold_action_lane().await;
+        let _actions = self.actions.hold_lane().await;
         let page = self.fetch_whole(ids).await?;
         let requested: HashSet<NotificationId> = ids.iter().copied().collect();
         Ok(self.cache.execute(|connection| {

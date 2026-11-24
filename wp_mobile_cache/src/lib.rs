@@ -2,6 +2,8 @@ use rusqlite::functions::FunctionFlags;
 use rusqlite::hooks::Action;
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::repository::entity_state::EntityStateRepository;
@@ -401,9 +403,13 @@ pub fn does_sqlite_support_returning(version: &str) -> bool {
     false
 }
 
+/// Values in memory that every service of one owner row on this cache shares, by row and type.
+type SharedState = Mutex<HashMap<(RowId, TypeId), Arc<dyn Any + Send + Sync>>>;
+
 #[derive(uniffi::Object)]
 pub struct WpApiCache {
     inner: DBManager,
+    shared: SharedState,
 }
 
 #[uniffi::export]
@@ -412,6 +418,7 @@ impl WpApiCache {
     pub fn new(path: Option<String>) -> Result<Self, SqliteDbError> {
         Ok(Self {
             inner: DBManager::new(&path)?,
+            shared: SharedState::default(),
         })
     }
 
@@ -526,7 +533,7 @@ impl WpApiCache {
         &self,
         user_id: WpComUserId,
     ) -> Result<bool, SqliteDbError> {
-        self.execute(|connection| WordPressComAccountRepository::delete(connection, user_id))
+        self.remove_owner(ReaderOwner::Account { user_id })
     }
 
     /// Remove everything cached for a reader, such as their Reader posts, streams and followed
@@ -539,7 +546,7 @@ impl WpApiCache {
     ///
     /// Returns `true` if anything was cached for the reader.
     pub fn remove_reader_data(&self, owner: ReaderOwner) -> Result<bool, SqliteDbError> {
-        self.execute(|connection| WordPressComAccountRepository::delete_owner(connection, owner))
+        self.remove_owner(owner)
     }
 }
 
@@ -590,6 +597,40 @@ impl WpApiCache {
         let mut conn = self.inner.connection.lock().unwrap();
         f(&mut conn)
     }
+
+    /// Returns the one `T` that every service of `owner_row` on this cache object shares, made
+    /// the first time it's asked for. It's in memory only, and lives as long as this object:
+    /// another `WpApiCache`, even of the same file, has its own. Removing the owner drops it.
+    pub fn shared_state<T: Default + Send + Sync + 'static>(&self, owner_row: RowId) -> Arc<T> {
+        let value = self
+            .shared
+            .lock()
+            .expect("shared state lock poisoned")
+            .entry((owner_row, TypeId::of::<T>()))
+            .or_insert_with(|| Arc::new(T::default()))
+            .clone();
+        value
+            .downcast::<T>()
+            .expect("shared state is keyed by its type")
+    }
+
+    /// Deletes everything cached for `owner`, and drops its shared state, so an owner whose row
+    /// gets the same ID later starts with none.
+    fn remove_owner(&self, owner: ReaderOwner) -> Result<bool, SqliteDbError> {
+        let (row, removed) = self.execute(|connection| {
+            Ok::<_, SqliteDbError>((
+                WordPressComAccountRepository::select_owner(connection, owner)?,
+                WordPressComAccountRepository::delete_owner(connection, owner)?,
+            ))
+        })?;
+        if let Some(row) = row {
+            self.shared
+                .lock()
+                .expect("shared state lock poisoned")
+                .retain(|(owner_row, _), _| *owner_row != row);
+        }
+        Ok(removed)
+    }
 }
 
 impl TryFrom<Connection> for WpApiCache {
@@ -606,6 +647,7 @@ impl TryFrom<Connection> for WpApiCache {
             inner: DBManager {
                 connection: Mutex::new(connection),
             },
+            shared: SharedState::default(),
         })
     }
 }

@@ -110,16 +110,10 @@ fn service_with(delegate: WpApiClientDelegate) -> Result<NotificationService, Fa
     let cache = WpApiCache::new(None).map_err(|e| e.to_string())?;
     cache.perform_migrations().map_err(|e| e.to_string())?;
     // The cache is the trial's own, so any user ID keys it.
-    let reader = wp_mobile::service::reader::ReaderService::new(
-        delegate.clone(),
-        Arc::new(cache),
-        wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner::Account {
-            user_id: WpComUserId(1),
-        },
-        wp_api::wp_com::reader_saved::ReaderSavedSource::Ios,
+    Ok(
+        NotificationService::new(delegate, Arc::new(cache), WpComUserId(1))
+            .map_err(|e| e.to_string())?,
     )
-    .map_err(|e| e.to_string())?;
-    Ok(NotificationService::new(delegate, Arc::new(reader)).map_err(|e| e.to_string())?)
 }
 
 fn service(ctx: &TestContext) -> Result<NotificationService, Failed> {

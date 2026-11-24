@@ -29,6 +29,7 @@ use wp_mobile_cache::repository::notifications::{
     DbNotificationFilter, DbNotificationReadChange, NotificationReadChangeRepository,
     NotificationRepository,
 };
+use wp_mobile_cache::repository::reader_actions::ReaderActionRepository;
 use wp_mobile_cache::{RowId, SqliteDbError};
 
 /// What the requests name the client as. The API uses it for its stats only.
@@ -331,9 +332,11 @@ impl NotificationService {
         Ok(self.client.me().unseen_notes().await?.data.has_unseen_notes)
     }
 
-    /// Sends the changes waiting, such as notes marked read while offline, oldest first. Returns
-    /// how many are still waiting. Call it at launch, when the app comes to the foreground, and
-    /// when the device comes back online.
+    /// Sends the changes waiting, such as notes marked read while offline, oldest first, then
+    /// everything waiting in the account's queue: likes and follows made from a note, and
+    /// whatever the account's Reader service queued. Returns how many of both are still waiting.
+    /// Call it at launch, when the app comes to the foreground, and when the device comes back
+    /// online.
     ///
     /// A change the server refuses for good is dropped, and the notes show as the server has
     /// them. It's logged, and no call returns it.
@@ -342,7 +345,21 @@ impl NotificationService {
             let _lane = self.lane.lock().await;
             self.send_waiting().await?;
         }
-        self.pending_change_count()
+        {
+            let _actions = self.actions.hold_lane().await;
+            self.actions.send_pending_actions().await?;
+        }
+        Ok(self.pending_change_count()? + self.pending_action_count()?)
+    }
+
+    /// How many changes are waiting in the account's queue: likes and follows made from a note,
+    /// and whatever the account's Reader service queued, such as a post marked seen. It's the
+    /// number [`crate::service::reader::ReaderService::pending_action_count`] returns. Doesn't
+    /// touch the network.
+    pub fn pending_action_count(&self) -> Result<u64, NotificationServiceError> {
+        Ok(self
+            .cache
+            .execute(|connection| ReaderActionRepository::count(&*connection, self.account))?)
     }
 
     /// How many changes are waiting to be sent: one for each note marked read or unread, one

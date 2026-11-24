@@ -9,15 +9,6 @@ struct NotificationServiceTests {
 
     private let client = WPComApiClient(authentication: .none)
 
-    /// The notifications service for account 1, made with its Reader service as an app makes it.
-    private func makeService(
-        _ client: WPComApiClient,
-        cache: WordPressApiCache
-    ) throws -> NotificationService {
-        let reader = try client.makeReaderService(cache: cache, owner: .account(userId: 1), savedSource: .ios)
-        return try client.makeNotificationService(reader: reader)
-    }
-
     private func openCache() throws -> WordPressApiCache {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("notifications-\(UUID().uuidString).sqlite")
@@ -29,7 +20,7 @@ struct NotificationServiceTests {
     @Test
     func aNewAccountHasNoNotificationsYet() throws {
         let cache = try openCache()
-        let service = try makeService(client, cache: cache)
+        let service = try client.makeNotificationService(cache: cache, userID: 1)
         service.setLanguage(language: .portugueseBrazil)
 
         let notes: [WpComNotification] = try service.loadNotes(filter: NotificationsFilter())
@@ -45,7 +36,7 @@ struct NotificationServiceTests {
     @Test
     func eachTabStartsEmptyAndHasItsName() async throws {
         let cache = try openCache()
-        let service = try makeService(client, cache: cache)
+        let service = try client.makeNotificationService(cache: cache, userID: 1)
 
         let tabs: [NotificationTab] = [.all, .unread, .comments, .subscribers, .likes]
         for tab in tabs {
@@ -73,7 +64,7 @@ struct NotificationServiceTests {
             urlSession: URLSession(configuration: configuration),
             authentication: .none
         )
-        let service = try makeService(offline, cache: cache)
+        let service = try offline.makeNotificationService(cache: cache, userID: 1)
 
         let read: NotificationChangeOutcome = try await service.markRead(noteIds: [10_000_000_001])
         #expect(read == .waiting)
@@ -95,7 +86,7 @@ struct NotificationServiceTests {
     @Test
     func aNoteThatIsNotCachedCannotBeLikedOrFollowed() async throws {
         let cache = try openCache()
-        let service = try makeService(client, cache: cache)
+        let service = try client.makeNotificationService(cache: cache, userID: 1)
         let noteID: NotificationId = 10_000_000_001
 
         try await expectNotCached(noteID) { try await service.setPostLiked(noteId: noteID, liked: true) }
@@ -103,6 +94,7 @@ struct NotificationServiceTests {
         try await expectNotCached(noteID) {
             try await service.setSiteFollowed(noteId: noteID, siteId: 7001, followed: true)
         }
+        #expect(try service.pendingActionCount() == 0)
         #expect(NotificationServiceError.NoteNotCached(noteId: noteID).userMessage == nil)
         let refused = NotificationServiceError.ActionRefused(change: .followSite, error: .MissingIds)
         #expect(refused.userMessage(languages: ["en-US"]) == "You are not subscribed to this site.")
@@ -124,7 +116,7 @@ struct NotificationServiceTests {
     @Test
     func signingOutRemovesTheAccountsNotifications() throws {
         let cache = try openCache()
-        _ = try makeService(client, cache: cache)
+        _ = try client.makeNotificationService(cache: cache, userID: 1)
         #expect(try cache.removeWordpressComAccount(userId: 1))
         #expect(try cache.removeWordpressComAccount(userId: 1) == false)
     }

@@ -76,8 +76,9 @@ class WpComApiClient(
      * no authentication. What that reader follows and saves stays on the device.
      *
      * The cache's migrations must have run. [savedSource] is the app, which is recorded with each
-     * save. Create one per reader and share it: it sends one change at a time, and a second
-     * instance would send alongside it.
+     * save. Create one per reader and share it: it sends its saves one at a time, and a second
+     * instance would send them alongside it. Its other changes go in the account's one queue in
+     * [cache], which the account's notifications service shares.
      */
     fun makeReaderService(
         cache: WordPressApiCache,
@@ -86,16 +87,18 @@ class WpComApiClient(
     ): ReaderService = ReaderService(delegate, cache.cache, owner, savedSource)
 
     /**
-     * Creates the notifications service for [reader]'s account. It keeps the account's notes in
-     * [reader]'s cache, syncs the newest by comparing hashes, and loads older ones a page at a time.
-     * Its syncs send only GET requests.
+     * Creates the notifications service for one account. It keeps the account's notes in [cache],
+     * syncs the newest by comparing hashes, and loads older ones a page at a time. Its syncs send
+     * only GET requests.
      *
-     * Likes and follows made from a note go through [reader]'s queue, so pass the app's one Reader
-     * service for the account, made with [makeReaderService]. An app that shows no Reader still
-     * makes one. Throws for the signed-out reader's. Create one per account and share it.
+     * Likes and follows made from a note go in the account's one queue in [cache], which the
+     * account's Reader service shares, so they're sent whichever of the two exist. The cache's
+     * migrations must have run. Create one per account and share it.
      */
-    fun makeNotificationService(reader: ReaderService): NotificationService =
-        NotificationService(delegate, reader)
+    fun makeNotificationService(
+        cache: WordPressApiCache,
+        userId: ULong
+    ): NotificationService = NotificationService(delegate, cache.cache, userId)
 
     // Provides the _only_ way to execute authenticated requests using our Kotlin wrapper.
     //

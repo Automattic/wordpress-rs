@@ -139,9 +139,9 @@ impl ReaderService {
     /// names aren't translated. The menu is cached in the language it was fetched in, so after a
     /// change of language, it's the new language's once this has run again.
     ///
-    /// It doesn't read the menu while a change of this service's, such as a tag follow, is being
-    /// sent, and the service doesn't send one while it reads, so a menu read before a follow or
-    /// unfollow isn't stored after the server has taken it. The server's followed tags can still
+    /// It doesn't read the menu while a change of the account's, such as a tag follow, is being
+    /// sent, and no change is sent while it reads, so a menu read before a follow or unfollow
+    /// isn't stored after the server has taken it. The server's followed tags can still
     /// be wrong after a change it answered 200 to: [`Self::set_tag_followed`] has what was
     /// measured. As measured on 2026-11-20, every read of the followed tags agreed with every
     /// other each time (the menu, `read/tags` in `rest/v1.1` and `rest/v1.2`, and
@@ -149,7 +149,7 @@ impl ReaderService {
     pub async fn refresh_menu(&self) -> Result<(), ReaderError> {
         let context = &self.context;
         // Held from the read to the store, as `refresh_blocked_sites` holds it.
-        let _lane = context.actions.lane.lock().await;
+        let _lane = context.actions.hold_lane().await;
         let params = ReaderMenuParams {
             locale: context.locale(),
         };

@@ -4,7 +4,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import rs.wordpress.cache.kotlin.WordPressApiCache
 import uniffi.wp_api.NotificationTab
-import uniffi.wp_api.ReaderSavedSource
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpNetworkHeaderMap
@@ -17,7 +16,6 @@ import uniffi.wp_mobile.NotificationServiceException
 import uniffi.wp_mobile.NotificationsFilter
 import uniffi.wp_mobile.ReaderException
 import uniffi.wp_mobile.notificationServiceErrorUserMessage
-import uniffi.wp_mobile_cache.ReaderOwner
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -54,11 +52,6 @@ class NotificationServiceTest {
 
     private val client = WpComApiClient(WpAuthenticationProvider.none(), executor)
 
-    /** The notifications service for account 1, made with its Reader service as an app makes it. */
-    private fun WpComApiClient.makeService(cache: WordPressApiCache) = makeNotificationService(
-        makeReaderService(cache, ReaderOwner.Account(1uL), ReaderSavedSource.ANDROID)
-    )
-
     private fun isPost(request: WpNetworkRequest, path: String) =
         request.method() == RequestMethod.POST && request.url().contains("/rest/v1.1$path?")
 
@@ -78,7 +71,7 @@ class NotificationServiceTest {
     fun notesAreMarkedReadUnreadAndSeen() = runTest {
         val cache = WordPressApiCache()
         cache.performMigrations()
-        val service = WpComApiClient(WpAuthenticationProvider.none(), writes).makeService(cache)
+        val service = WpComApiClient(WpAuthenticationProvider.none(), writes).makeNotificationService(cache, 1uL)
         service.sync()
 
         assertEquals(NotificationChangeOutcome.SENT, service.markRead(listOf(10_000_000_002uL)))
@@ -100,7 +93,7 @@ class NotificationServiceTest {
     fun aSyncStoresTheNewestNotesAndANewHashDownloadsAgain() = runTest {
         val cache = WordPressApiCache()
         cache.performMigrations()
-        val service = client.makeService(cache)
+        val service = client.makeNotificationService(cache, 1uL)
 
         val first = service.sync()
         assertEquals(2uL, first.downloadedCount)
@@ -120,7 +113,7 @@ class NotificationServiceTest {
     fun eachTabShowsItsOwnNotesAndANoteCanBeRemoved() = runTest {
         val cache = WordPressApiCache()
         cache.performMigrations()
-        val service = client.makeService(cache)
+        val service = client.makeNotificationService(cache, 1uL)
         service.sync()
 
         assertEquals(listOf(10_000_000_002uL), service.loadTabNotes(NotificationTab.UNREAD).map { it.id })
@@ -139,7 +132,7 @@ class NotificationServiceTest {
     fun aNoteThatIsNotCachedCannotBeLikedOrFollowed() = runTest {
         val cache = WordPressApiCache()
         cache.performMigrations()
-        val service = client.makeService(cache)
+        val service = client.makeNotificationService(cache, 1uL)
 
         val error = assertFailsWith<NotificationServiceException.NoteNotCached> {
             service.setPostLiked(10_000_000_009uL, true)
@@ -151,6 +144,7 @@ class NotificationServiceTest {
         assertFailsWith<NotificationServiceException.NoteNotCached> {
             service.setSiteFollowed(10_000_000_009uL, 7001uL, true)
         }
+        assertEquals(0uL, service.pendingActionCount())
         assertEquals(null, notificationServiceErrorUserMessage(error, null))
         val refused = NotificationServiceException.ActionRefused(
             NotificationNoteChange.LIKE_COMMENT,

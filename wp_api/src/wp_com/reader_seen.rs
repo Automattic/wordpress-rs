@@ -16,7 +16,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 /// The app marking a post, recorded with it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
 pub enum ReaderSeenSource {
     #[serde(rename = "reader-android")]
     Android,
