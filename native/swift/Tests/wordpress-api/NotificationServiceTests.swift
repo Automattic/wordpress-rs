@@ -51,7 +51,9 @@ struct NotificationServiceTests {
         #expect(try await service.removeNote(noteId: 10_000_000_001) == false)
     }
 
-    #if !os(Linux)
+    // Only where `NotificationsOfflineURLProtocol` is sure to catch a request with a body: on the
+    // watchOS simulator it doesn't, and these requests would reach WordPress.com.
+    #if os(macOS) || os(iOS)
     /// Every request fails as it does on a device with no connection, so nothing reaches a server.
     @Test
     func changesMadeOfflineWaitAndShowAtOnce() async throws {
@@ -90,7 +92,7 @@ struct NotificationServiceTests {
     }
 }
 
-#if !os(Linux)
+#if os(macOS) || os(iOS)
 /// Fails every request as a device without a connection does, so nothing reaches the network.
 private final class NotificationsOfflineURLProtocol: URLProtocol {
     override static func canInit(with request: URLRequest) -> Bool { true }
