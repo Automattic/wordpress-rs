@@ -20,6 +20,8 @@ use wp_api::{
     prelude::*,
 };
 
+mod wpcom_login;
+
 const TOKIO_STREAM_SIZE: usize = 5;
 
 #[derive(Parser)]
@@ -40,6 +42,8 @@ enum Commands {
     },
     /// Fetch a single post and its comments
     FetchPost(FetchPostArgs),
+    /// Sign in to WordPress.com in a browser and save the account's bearer token to a file
+    WpcomLogin(wpcom_login::WpComLoginArgs),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -120,6 +124,9 @@ async fn main() -> Result<()> {
         }
         Commands::FetchPost(args) => {
             fetch_post_and_comments(args).await?;
+        }
+        Commands::WpcomLogin(args) => {
+            wpcom_login::wpcom_login(args).await?;
         }
     }
 

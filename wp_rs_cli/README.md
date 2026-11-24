@@ -33,6 +33,7 @@ wp_rs_cli --help
 
 - `discover-login-url`: Tries connecting to the given URL, and prints the library's relevant error message if unable to.
 - `fetch-post`: Fetch a post and its comments, supporting WordPress.com (Bearer token) and WordPress.org/Jetpack (Application Password) sites.
+- `wpcom-login`: Sign in to WordPress.com in a browser and save the account's bearer token to a file.
 
 ### fetch-post examples
 
@@ -78,3 +79,22 @@ wp_rs_cli fetch-post \
 ## License
 
 This project is licensed under the MPL license.
+
+### wpcom-login
+
+Signs in with the OAuth2 authorization code flow and writes the token to a file only you can read. The token is never printed.
+
+You need a WordPress.com application from https://developer.wordpress.com/apps/. The command reads its client ID and secret from a JSON file such as this repository's `wp_com_test_credentials.json`.
+
+```bash
+# The application lists http://localhost:8765/callback as a redirect URL: the sign-in is caught automatically.
+wp_rs_cli wpcom-login --credentials-file wp_com_test_credentials.json --out ~/.wpcom-token
+
+# Any other redirect URL: paste the address the browser ends up at when asked.
+wp_rs_cli wpcom-login --credentials-file wp_com_test_credentials.json --redirect-uri myapp://authorized --out ~/.wpcom-token
+
+# Print the sign-in address instead of opening a browser, to sign in as another account in a private window.
+wp_rs_cli wpcom-login --credentials-file wp_com_test_credentials.json --out ~/.wpcom-token-2 --no-browser
+```
+
+The client ID can also come from `--client-id` or `WP_COM_CLIENT_ID`, and the secret from `--client-secret-file` or `WP_COM_CLIENT_SECRET`. The secret is never taken as an argument, so it stays out of the shell history.
