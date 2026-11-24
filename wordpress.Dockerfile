@@ -1,12 +1,17 @@
 ARG WORDPRESS_VERSION="6.8.1"
 
-# TEMP: no Docker image exists for 7.2-RC3, so start from the newest 7.2 beta image and
-# unpack RC3's files over it. The image copies /usr/src/wordpress into the site on first start.
-FROM public.ecr.aws/docker/library/wordpress:beta-7.2
+# TEMP: no Docker image exists for 7.2-RC3. Start from the 6.8.1 image, which is on Debian 12
+# like trunk (the beta-7.2 image is on Debian 13, which Swift 6.2 has no build for), and replace
+# its WordPress files with RC3's. The image copies /usr/src/wordpress into the site on first start.
+FROM public.ecr.aws/docker/library/wordpress:6.8.1
 ARG WORDPRESS_VERSION
-RUN curl -fsSL "https://wordpress.org/wordpress-${WORDPRESS_VERSION}.tar.gz" | tar -xz -C /usr/src \
-  && chown -R www-data:www-data /usr/src/wordpress \
-  && grep -F "\$wp_version = '${WORDPRESS_VERSION}'" /usr/src/wordpress/wp-includes/version.php
+RUN cd /usr/src \
+  && mv wordpress/wp-config-docker.php wordpress/.htaccess /tmp/ \
+  && rm -rf wordpress \
+  && curl -fsSL "https://wordpress.org/wordpress-${WORDPRESS_VERSION}.tar.gz" | tar -xz \
+  && mv /tmp/wp-config-docker.php /tmp/.htaccess wordpress/ \
+  && chown -R www-data:www-data wordpress \
+  && grep -F "\$wp_version = '${WORDPRESS_VERSION}'" wordpress/wp-includes/version.php
 
 RUN apt-get update  \
   && apt-get install -y wget gpg
