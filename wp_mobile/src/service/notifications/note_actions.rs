@@ -50,7 +50,23 @@ pub(crate) enum NoteActionTarget {
     },
 }
 
+/// A kind of like or follow a note can show.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NoteActionKind {
+    PostLike,
+    CommentLike,
+    Follow,
+}
+
 impl NoteActionTarget {
+    fn kind(&self) -> NoteActionKind {
+        match self {
+            Self::Post { .. } => NoteActionKind::PostLike,
+            Self::Comment { .. } => NoteActionKind::CommentLike,
+            Self::Site { .. } => NoteActionKind::Follow,
+        }
+    }
+
     /// The name of the note action that shows it, as the API sends it.
     fn action_name(&self) -> &'static str {
         match self {
@@ -74,18 +90,24 @@ pub enum NotificationNoteChange {
 
 impl NotificationNoteChange {
     fn new(target: &NoteActionTarget, on: bool) -> Self {
-        match (target, on) {
-            (NoteActionTarget::Post { .. }, true) => Self::LikePost,
-            (NoteActionTarget::Post { .. }, false) => Self::UnlikePost,
-            (NoteActionTarget::Comment { .. }, true) => Self::LikeComment,
-            (NoteActionTarget::Comment { .. }, false) => Self::UnlikeComment,
-            (NoteActionTarget::Site { .. }, true) => Self::FollowSite,
-            (NoteActionTarget::Site { .. }, false) => Self::UnfollowSite,
+        Self::of(target.kind(), on)
+    }
+
+    /// The change that turns a like or follow of `kind` on or off. A note's change and a queued
+    /// action's event both take their message for the user from it.
+    pub(crate) fn of(kind: NoteActionKind, on: bool) -> Self {
+        match (kind, on) {
+            (NoteActionKind::PostLike, true) => Self::LikePost,
+            (NoteActionKind::PostLike, false) => Self::UnlikePost,
+            (NoteActionKind::CommentLike, true) => Self::LikeComment,
+            (NoteActionKind::CommentLike, false) => Self::UnlikeComment,
+            (NoteActionKind::Follow, true) => Self::FollowSite,
+            (NoteActionKind::Follow, false) => Self::UnfollowSite,
         }
     }
 
     /// What the user is told when the server refuses it, in `locale`.
-    fn refused_message(self, locale: Option<WpLocale>) -> String {
+    pub(crate) fn refused_message(self, locale: Option<WpLocale>) -> String {
         match self {
             Self::LikePost => WpMessages::notification_like_post_refused(),
             Self::UnlikePost => WpMessages::notification_unlike_post_refused(),
