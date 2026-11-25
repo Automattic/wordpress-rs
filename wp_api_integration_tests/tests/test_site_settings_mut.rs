@@ -48,7 +48,8 @@ generate_test!(use_smilies, false, "");
 generate_test!(default_category, 2);
 generate_test!(default_post_format, "new_post_format".to_string());
 generate_test!(posts_per_page, 27);
-generate_test!(show_on_front, "new_front".to_string());
+// WordPress 7.1.5 and later store any value other than "page" as "posts".
+generate_test!(show_on_front, "page".to_string());
 generate_test!(page_on_front, 2);
 generate_test!(page_for_posts, 2);
 generate_test!(default_ping_status, SiteSettingsPingStatus::Closed);
