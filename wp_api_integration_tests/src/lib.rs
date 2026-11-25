@@ -208,6 +208,10 @@ pub fn test_site_api_url_resolver() -> Arc<dyn ApiUrlResolver> {
 
 pub trait AssertWpError<T: std::fmt::Debug> {
     fn assert_wp_error(self, expected_error_code: WpErrorCode);
+
+    /// Asserts that the error code is one of `expected_error_codes`, for errors whose code
+    /// depends on the WordPress version.
+    fn assert_wp_error_one_of(self, expected_error_codes: &[WpErrorCode]);
 }
 
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
@@ -222,6 +226,23 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
             assert_eq!(
                 expected_error_code, error_code,
                 "Incorrect error code. Expected '{expected_error_code:?}', found '{error_code:?}'. Response was: '{response:?}'"
+            );
+        } else {
+            panic!("Unexpected wp_error '{err}'");
+        }
+    }
+
+    fn assert_wp_error_one_of(self, expected_error_codes: &[WpErrorCode]) {
+        let err = self.unwrap_err();
+        if let WpApiError::WpError {
+            error_code,
+            response,
+            ..
+        } = err
+        {
+            assert!(
+                expected_error_codes.contains(&error_code),
+                "Incorrect error code. Expected one of '{expected_error_codes:?}', found '{error_code:?}'. Response was: '{response:?}'"
             );
         } else {
             panic!("Unexpected wp_error '{err}'");
