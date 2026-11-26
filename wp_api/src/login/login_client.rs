@@ -30,6 +30,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::sync::Arc;
+use url::Url;
 use uuid::Uuid;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
@@ -223,7 +224,7 @@ impl WpLoginClient {
     /// resolved against the address that was requested, because a response doesn't say where
     /// a redirect ended up, and a site can advertise a stale address. When the fallback fails
     /// to fetch or parse too, the advertised address's failure is reported. When the fallback
-    /// gets further, its failure is reported instead.
+    /// gets past fetching and parsing, its failure is reported instead.
     async fn fetch_and_parse_advertised_api_root(
         &self,
         parsed_site_url: Arc<ParsedUrl>,
@@ -249,11 +250,11 @@ impl WpLoginClient {
             FetchAndParseApiRootFailure::FetchApiRoot { .. }
                 | FetchAndParseApiRootFailure::ParseApiRoot { .. }
         ) {
-            // The advertised address is an API root; the failure is about the site.
+            // The advertised address answered as WordPress; the failure is about the site.
             return Err(advertised_failure(failure));
         }
         let Some(root_wp_json_url) = Self::root_wp_json_url((*parsed_site_url).clone())
-            .filter(|url| *url != *api_root_url.0)
+            .filter(|url| !same_ignoring_trailing_slash(&url.inner, &api_root_url.0.inner))
             .map(Arc::new)
         else {
             return Err(advertised_failure(failure));
@@ -719,6 +720,18 @@ impl PerformsRequests for WpLoginClient {
     fn get_request_executor(&self) -> Arc<dyn RequestExecutor> {
         self.request_executor.clone()
     }
+}
+
+/// Whether `a` and `b` differ at most by a trailing `/` on the path. WordPress serves the same
+/// REST API root at `<site>/wp-json` and `<site>/wp-json/`.
+fn same_ignoring_trailing_slash(a: &Url, b: &Url) -> bool {
+    let trimmed = |url: &Url| {
+        let mut url = url.clone();
+        let path = url.path().trim_end_matches('/').to_string();
+        url.set_path(&path);
+        url
+    };
+    trimmed(a) == trimmed(b)
 }
 
 #[cfg(test)]
@@ -1255,25 +1268,106 @@ mod tests {
         }
     }
 
+    // WordPress core advertises `<site>/wp-json/`, with the slash, and serves the same root
+    // without it, so the fallback would request the same root again.
+    #[rstest]
+    #[case::without_slash("https://example.com/blog/wp-json")]
+    #[case::with_slash("https://example.com/blog/wp-json/")]
     #[tokio::test]
-    async fn test_api_discovery_doesnt_retry_when_advertised_root_is_wp_json() {
+    async fn test_api_discovery_doesnt_retry_when_advertised_root_is_wp_json(
+        #[case] advertised: &str,
+    ) {
         let (result, requested_urls) = discover(
             "https://example.com/blog",
             vec![(
                 "https://example.com/blog",
-                homepage_with_api_root_link("/blog/wp-json"),
+                homepage_with_api_root_link(advertised),
             )],
         )
         .await;
-        // The fallback would request the same address again.
+        assert_eq!(requested_urls, ["https://example.com/blog", advertised]);
+        assert!(result.is_err());
+    }
+
+    /// An API root for the site at `home` that offers no way to sign in.
+    fn api_root_body_without_authentication(home: &str) -> String {
+        format!(
+            r#"{{"name":"Site","description":"","url":"{home}","home":"{home}","gmt_offset":0,"timezone_string":"","namespaces":["wp/v2"],"authentication":{{}},"routes":{{}}}}"#
+        )
+    }
+
+    // An advertised root that answers as WordPress is the site's API root, so its failure is
+    // reported without trying `<site>/wp-json`.
+    #[tokio::test]
+    async fn test_api_discovery_doesnt_fall_back_when_advertised_root_is_wordpress() {
+        let (result, requested_urls) = discover(
+            "https://example.com/blog",
+            vec![
+                (
+                    "https://example.com/blog",
+                    homepage_with_api_root_link("/api/"),
+                ),
+                (
+                    "https://example.com/api/",
+                    api_root_body_without_authentication("https://example.com/blog"),
+                ),
+                (
+                    "https://example.com/blog/wp-json",
+                    api_root_body("https://example.com/blog"),
+                ),
+            ],
+        )
+        .await;
+        assert_eq!(
+            requested_urls,
+            ["https://example.com/blog", "https://example.com/api/"]
+        );
+        match result {
+            Err(AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                api_root_url,
+                fetch_and_parse_api_root_failure:
+                    FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { .. },
+                ..
+            }) => assert_eq!(api_root_url.url(), "https://example.com/api/"),
+            other => panic!("unexpected result: {other:#?}"),
+        }
+    }
+
+    // When `<site>/wp-json` answers as WordPress, its failure says more than the advertised
+    // root's, so it's the one reported.
+    #[tokio::test]
+    async fn test_api_discovery_reports_fallback_failure_when_it_got_further() {
+        let (result, requested_urls) = discover(
+            "https://example.com/blog",
+            vec![
+                (
+                    "https://example.com/blog",
+                    homepage_with_api_root_link("/wrong/"),
+                ),
+                (
+                    "https://example.com/blog/wp-json",
+                    api_root_body_without_authentication("https://example.com/blog"),
+                ),
+            ],
+        )
+        .await;
         assert_eq!(
             requested_urls,
             [
                 "https://example.com/blog",
-                "https://example.com/blog/wp-json"
+                "https://example.com/wrong/",
+                "https://example.com/blog/wp-json",
             ]
         );
-        assert!(result.is_err());
+        match result {
+            Err(AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                api_root_url,
+                fetch_and_parse_api_root_failure:
+                    FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { .. },
+                ..
+            }) => assert_eq!(api_root_url.url(), "https://example.com/blog/wp-json"),
+            other => panic!("unexpected result: {other:#?}"),
+        }
     }
 
     #[rstest]
