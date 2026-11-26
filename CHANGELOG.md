@@ -12,9 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CreateSupportTicketParams` and `AddMessageToSupportConversationParams` accept `attachmentURLs: [URL]` alongside the existing `attachments: [String]`. Attachments cross the bindings as filesystem paths and the request executor opens each one directly, so a caller converting a file URL with `URL.path()` — which percent-encodes by default — produced a path that doesn't exist on disk and failed the request with `MediaFileNotFound`. A filename with a space is enough, and non-ASCII names are escaped too. The new initializers own the conversion.
 - `OAuth2ConfigurationStore.configuration_for(endpoints)`: like `find_configuration`, but fails with a localized `OAuth2ConfigurationStoreError` when the site's OAuth2 provider isn't registered, so apps can show a message instead of silently doing nothing.
 - **Internal:** `wp_rs_cli wpcom-login` signs in to WordPress.com in a browser with the OAuth2 authorization code flow and saves the account's bearer token to a file only you can read, without printing it. It reads the application's client ID and secret from a JSON file such as `wp_com_test_credentials.json`. It catches the sign-in itself when the application lists `http://localhost:8765/callback` as a redirect URL, and asks for the address the browser was sent to for any other redirect URL.
-### Fixed
-
-- `site_icons` and `preferred_site_icon` now treat whitespace in an icon address the way a browser does: only ASCII whitespace is stripped from the ends, so an address starting with a no-break space is no longer read as root-relative. Icons inside an SVG element named `template` are no longer skipped.
 
 ### Changed
 
@@ -24,10 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** The tests of how TLS failures are reported use a copy of badssl.com that CI runs on each machine (`scripts/badssl-server.sh`), instead of the live site, which sometimes drops connections. They skip unless `BADSSL_DOMAIN` is set.
 - **Internal:** Mac CI runs on the `xcode-27.2-v4` image, which stops the SSH connection drops shortly after boot seen on `xcode-27.2-v3`.
 - **Internal:** Two integration tests pass on WordPress 7.2 as well as 6.8.1. The comment test for a missing author accepts the permission error that 7.2 returns first, and the `show_on_front` settings test uses `page`, since WordPress 7.1.5 and later store any other value as `posts`.
+- **Internal:** Moved the browser-style link resolution that `site_icons` uses (relative addresses, `<base href>`, `http`/`https` only) into a shared `html_links` module, so other code that reads links from a page can use it.
 
 ### Fixed
 
 - The Kotlin `WpRequestExecutor` no longer makes `WpApiClient.request` throw an `InternalException` for a header value with non-ASCII characters. It now sends the value as UTF-8, as reqwest does.
+- `site_icons` and `preferred_site_icon` now treat whitespace in an icon address the way a browser does: only ASCII whitespace is stripped from the ends, so an address starting with a no-break space is no longer read as root-relative. An HTML icon link inside an SVG `<foreignObject>` is no longer skipped when an SVG element named `template` contains it.
 
 ### Fixed
 
@@ -37,7 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The Kotlin `WpRequestExecutor` no longer makes `WpApiClient.request` throw an `InternalException` when it's asked to request an address that isn't `http` or `https`, such as a `file:` API root. OkHttp refuses those addresses, and its `IllegalArgumentException` escaped the executor. The request now fails with `GenericError`, as it does with reqwest.
-- **Internal:** Moved the browser-style link resolution that `site_icons` uses (relative addresses, `<base href>`, `http`/`https` only) into a shared `html_links` module, so other code that reads links from a page can use it.
 
 ## [0.11.1] - 2026-11-18
 
