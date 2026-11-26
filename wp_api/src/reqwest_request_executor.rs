@@ -370,20 +370,6 @@ pub(crate) fn find_error<'a, E: Error + 'static>(top: &'a (dyn Error + 'static))
 mod tests {
     use super::*;
 
-    // A refused connection — the host resolves (here, loopback), but nothing is
-    // listening on the port — must classify as `ConnectionError`, not
-    // `NonExistentSiteError` (which is reserved for DNS failures) and not the
-    // generic `HttpError` (which is a failure *after* a connection is
-    // established). Keeping the two apart lets `is_site_unreachable` cover both
-    // consistently while callers can still tell a bad domain from a down server
-    // across the Swift, Kotlin, and reqwest executors (#1495).
-    //
-    // The branch ordering in `request_execution_error_from_reqwest` is
-    // load-bearing: `ECONNREFUSED` carries an inner `io::Error`, so it is caught
-    // by the `as_io_error` branch *before* `is_connect()` — the DNS-`NXDOMAIN`
-    // fallback that maps to `NonExistentSiteError`. This test guards that
-    // ordering so a refactor can't silently reclassify a refused connection as
-    // an unreachable site.
     #[tokio::test]
     async fn response_url_is_where_a_redirect_ended() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -415,6 +401,20 @@ mod tests {
         assert_eq!(response.final_url().0, format!("{origin}/end/"));
     }
 
+    // A refused connection — the host resolves (here, loopback), but nothing is
+    // listening on the port — must classify as `ConnectionError`, not
+    // `NonExistentSiteError` (which is reserved for DNS failures) and not the
+    // generic `HttpError` (which is a failure *after* a connection is
+    // established). Keeping the two apart lets `is_site_unreachable` cover both
+    // consistently while callers can still tell a bad domain from a down server
+    // across the Swift, Kotlin, and reqwest executors (#1495).
+    //
+    // The branch ordering in `request_execution_error_from_reqwest` is
+    // load-bearing: `ECONNREFUSED` carries an inner `io::Error`, so it is caught
+    // by the `as_io_error` branch *before* `is_connect()` — the DNS-`NXDOMAIN`
+    // fallback that maps to `NonExistentSiteError`. This test guards that
+    // ordering so a refactor can't silently reclassify a refused connection as
+    // an unreachable site.
     #[tokio::test]
     async fn refused_connection_is_connection_error() {
         // Port 1 on loopback is privileged, so nothing is bound in any test

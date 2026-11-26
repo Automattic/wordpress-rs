@@ -548,10 +548,6 @@ class WpRequestExecutorTest {
         assertIs<WpErrorCode.Unauthorized>((result as WpRequestResult.WpError<*>).errorCode)
     }
 
-    /**
-     * Resolves media fixtures (e.g. `test_media.jpg`) from the test classpath so uploads can be
-     * built without touching the real filesystem layout.
-     */
     @Test
     fun `a relative link resolves against where a redirect ended`() = runTest {
         // The homepage at `/start` redirects to `/blog/`, whose `Link` header is relative.
@@ -575,6 +571,10 @@ class WpRequestExecutorTest {
         assertEquals(mockWebServer.url("/blog/wp-json/").toString(), result.success.apiRootUrl.url())
     }
 
+    /**
+     * Resolves media fixtures (e.g. `test_media.jpg`) from the test classpath so uploads can be
+     * built without touching the real filesystem layout.
+     */
     private class ClasspathFileResolver : FileResolver {
         override fun getFile(path: String): File? =
             this::class.java.classLoader?.getResource(path)?.file?.let { File(it) }
