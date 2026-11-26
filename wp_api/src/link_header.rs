@@ -45,6 +45,9 @@ pub(crate) fn parse(header: &str) -> Vec<LinkValue> {
         }
         match parse_entry(&mut cursor, header) {
             Some(link) => links.push(link),
+            // A target can't contain `<`, so one here starts the next entry. `parse_entry` has
+            // already moved past this entry's own `<`, so this always makes progress.
+            None if cursor.peek() == Some(b'<') => {}
             None => cursor.skip_to_next_entry(),
         }
     }
@@ -56,8 +59,8 @@ fn parse_entry(cursor: &mut Cursor<'_>, header: &str) -> Option<LinkValue> {
         return None;
     }
     let start = cursor.position;
-    cursor.advance_until(|b| b == b'>');
-    let target = header[start..cursor.position].trim().to_string();
+    cursor.advance_until(|b| matches!(b, b'>' | b'<'));
+    let target = header[start..cursor.position].trim_ascii().to_string();
     if !cursor.eat(b'>') {
         return None;
     }
@@ -335,6 +338,8 @@ mod tests {
     #[case::quoted_comma_in_skipped_entry(r#"</a> junk; title="x, y", </b>; rel="b""#)]
     #[case::stray_open_bracket(r#"junk <, </b>; rel="b""#)]
     #[case::bracketed_comma_in_skipped_entry(r#"junk <https://a/?i=1,2>; rel="a", </b>; rel="b""#)]
+    #[case::unclosed_target(r#"<https://a/?x, </b>; rel="b""#)]
+    #[case::open_bracket_after_target(r#"</a> <x, </b>; rel="b""#)]
     fn skips_an_entry_that_isnt_well_formed(#[case] header: &str) {
         assert_eq!(parse(header), [link("/b", &["b"])]);
     }
@@ -343,6 +348,15 @@ mod tests {
     fn an_unclosed_quote_ends_the_header() {
         // Everything after the quote is part of the quoted value, so nothing more can be read.
         assert_eq!(parse(r#"</a>; title="x, </b>; rel=b"#), []);
+    }
+
+    #[test]
+    fn keeps_a_no_break_space_in_the_target() {
+        // Only ASCII whitespace is trimmed, as `resolve_web_address` does.
+        assert_eq!(
+            parse("< /a\u{a0}>; rel=next"),
+            [link("/a\u{a0}", &["next"])]
+        );
     }
 
     #[rstest]

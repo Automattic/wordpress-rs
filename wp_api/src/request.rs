@@ -608,7 +608,8 @@ impl WpSupportsLocalization for WpNetworkHeaderMapError {
 }
 
 impl WpNetworkResponse {
-    /// The targets of the `Link` header entries with the relation type `name`, in order.
+    /// Returns the targets of the `Link` header entries with the relation type `name`, in
+    /// order.
     ///
     /// A target may be relative, such as `</wp-json/>; rel="https://api.w.org/"`. As RFC 8288
     /// says, it's resolved against the URL of the request this response answers. Executors
@@ -619,7 +620,16 @@ impl WpNetworkResponse {
     /// formed (without affecting the others), and entries with an `anchor`, which describe
     /// another resource.
     pub fn get_link_header(&self, name: &str) -> Vec<Url> {
-        let base_url = Url::parse(&self.request_url.0).ok();
+        self.link_header_targets(name, Url::parse(&self.request_url.0).ok().as_ref())
+    }
+
+    /// Returns what [`Self::get_link_header`] does, with relative targets resolved against
+    /// `base_url` instead.
+    pub(crate) fn get_link_header_relative_to(&self, name: &str, base_url: &Url) -> Vec<Url> {
+        self.link_header_targets(name, Some(base_url))
+    }
+
+    fn link_header_targets(&self, name: &str, base_url: Option<&Url>) -> Vec<Url> {
         // Header names are case-insensitive, so this finds `Link`, `link` and `LINK`.
         //
         // `WpNetworkHeaderMap` splits header values at every comma, including the commas inside
@@ -641,9 +651,9 @@ impl WpNetworkResponse {
             .filter(|link| link.has_rel(name))
             // An empty anchor names the response itself.
             .filter(|link| link.anchor.as_deref().is_none_or(str::is_empty))
-            .filter_map(|link| match &base_url {
+            .filter_map(|link| match base_url {
                 Some(base_url) => resolve_web_address(&link.target, base_url),
-                None => Url::parse(link.target.trim_ascii())
+                None => Url::parse(&link.target)
                     .ok()
                     .filter(|url| matches!(url.scheme(), "http" | "https")),
             })
@@ -1381,8 +1391,7 @@ mod tests {
 
     #[test]
     fn test_link_header_reads_the_rest_of_a_header_with_a_bad_entry() {
-        // The old parser dropped the whole header when one entry didn't parse, or when a
-        // target had a comma in it.
+        // A malformed entry, and a comma inside a target, don't affect the other entries.
         let response = response_with_link_header(
             "https://example.com/",
             r#"junk, <https://example.com/?ids=1,2&page=2>; rel="next", </wp-json/>; rel="https://api.w.org/""#,
