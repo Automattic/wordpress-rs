@@ -468,6 +468,10 @@ pub struct WpNetworkResponse {
     pub request_url: WpEndpointUrl,
     pub request_method: RequestMethod,
     pub request_header_map: Arc<WpNetworkHeaderMap>,
+    /// The URL the response came from: where any redirects ended. `None` when the executor
+    /// doesn't report it.
+    #[uniffi(default = None)]
+    pub response_url: Option<WpEndpointUrl>,
 }
 
 #[derive(Debug, Default, Clone, uniffi::Object)]
@@ -608,19 +612,23 @@ impl WpSupportsLocalization for WpNetworkHeaderMapError {
 }
 
 impl WpNetworkResponse {
+    /// Returns the URL the response came from: `response_url`, or `request_url` when the
+    /// executor didn't report where any redirects ended.
+    pub fn final_url(&self) -> &WpEndpointUrl {
+        self.response_url.as_ref().unwrap_or(&self.request_url)
+    }
+
     /// Returns the targets of the `Link` header entries with the relation type `name`, in
     /// order.
     ///
-    /// A target may be relative, such as `</wp-json/>; rel="https://api.w.org/"`. As RFC 8288
-    /// says, it's resolved against the URL of the request this response answers. Executors
-    /// report the URL that was requested, not where a redirect ended up, so after a redirect a
-    /// relative target may resolve against the wrong address.
+    /// A relative target, such as `</wp-json/>; rel="https://api.w.org/"`, is resolved against
+    /// [`Self::final_url`], as RFC 8288 says.
     ///
     /// Left out: targets that aren't `http` or `https` once resolved, entries that aren't well
     /// formed (without affecting the others), and entries with an `anchor`, which describe
     /// another resource.
     pub fn get_link_header(&self, name: &str) -> Vec<Url> {
-        self.link_header_targets(name, Url::parse(&self.request_url.0).ok().as_ref())
+        self.link_header_targets(name, Url::parse(&self.final_url().0).ok().as_ref())
     }
 
     /// Returns what [`Self::get_link_header`] does, with relative targets resolved against
@@ -1312,6 +1320,7 @@ mod tests {
             request_url: WpEndpointUrl("http://example.com".to_string()),
             request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            response_url: None,
         };
         assert_eq!(
             expected_prev_link_header
@@ -1342,6 +1351,7 @@ mod tests {
             request_url: WpEndpointUrl(request_url.to_string()),
             request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            response_url: None,
         }
     }
 
@@ -1386,6 +1396,18 @@ mod tests {
         assert_eq!(
             response.get_link_header("next"),
             [Url::parse(expected).unwrap()]
+        );
+    }
+
+    #[test]
+    fn test_link_header_resolves_against_where_a_redirect_ended() {
+        let response = WpNetworkResponse {
+            response_url: Some(WpEndpointUrl("https://www.example.com/blog/".to_string())),
+            ..response_with_link_header("https://example.com/blog", r#"<wp-json/>; rel="next""#)
+        };
+        assert_eq!(
+            response.get_link_header("next"),
+            [Url::parse("https://www.example.com/blog/wp-json/").unwrap()]
         );
     }
 
@@ -1537,6 +1559,7 @@ mod tests {
             )),
             request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            response_url: None,
         }
     }
 
@@ -1712,6 +1735,7 @@ mod tests {
             request_url: WpEndpointUrl("http://example.com".to_string()),
             request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            response_url: None,
         };
 
         assert_eq!(response.get_http_auth_method(), Ok(Some(expected_value)));
@@ -1734,6 +1758,7 @@ mod tests {
             request_url: WpEndpointUrl("http://example.com".to_string()),
             request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            response_url: None,
         };
 
         assert_eq!(response.get_retry_after(), Some(expected_value));

@@ -4,7 +4,7 @@ use crate::{
     html_links::{HtmlLinks, resolve_web_address},
     login::KnownAuthenticationBlockingPlugin,
     parsed_url::{ParseUrlError, ParsedUrl},
-    request::{ResponseBodyType, WpRedirect},
+    request::{ResponseBodyType, WpNetworkResponse, WpRedirect},
 };
 use itertools::Itertools;
 use scraper::{Html, Selector};
@@ -776,17 +776,30 @@ impl XmlrpcDiscoveryError {
     }
 }
 
-/// The address relative links on a site's homepage resolve against, when the homepage was
-/// requested at `site_url`.
+/// Returns the URL relative links on a site's homepage resolve against: the URL `homepage`
+/// came from, after any redirects. When that URL has the same path as `site_url`, where the
+/// homepage was requested, it's treated as a directory, as `site_url` is. `site_url` is used if
+/// that URL doesn't parse.
+pub(crate) fn homepage_base_url(homepage: &WpNetworkResponse, site_url: &Url) -> Url {
+    let Ok(page_url) = Url::parse(&homepage.final_url().0) else {
+        return site_directory_url(site_url);
+    };
+    // A redirect to another page, such as `example.com` to `www.example.com/home`, leaves the
+    // site's directory, so links resolve against that page, as a browser would.
+    if page_url.path().trim_end_matches('/') == site_url.path().trim_end_matches('/') {
+        site_directory_url(&page_url)
+    } else {
+        page_url
+    }
+}
+
+/// Returns `page_url` with a trailing slash added to its path.
 ///
-/// A site address is a directory, so this adds a trailing slash: links on `example.com/blog`
-/// resolve as they would on `example.com/blog/`, where WordPress redirects it. Without the
-/// slash, `wp-json/` would resolve to `example.com/wp-json/`.
-///
-/// The response doesn't say where a redirect ended up, so a homepage that redirects to another
-/// host or path still resolves against `site_url`.
-pub(crate) fn site_directory_url(site_url: &Url) -> Url {
-    let mut directory = site_url.clone();
+/// A site address is a directory, so links on `example.com/blog` resolve as they would on
+/// `example.com/blog/`. Without the slash, `wp-json/` would resolve to `example.com/wp-json/`,
+/// which can be another site.
+pub(crate) fn site_directory_url(page_url: &Url) -> Url {
+    let mut directory = page_url.clone();
     if !directory.cannot_be_a_base() && !directory.path().ends_with('/') {
         let path = format!("{}/", directory.path());
         directory.set_path(&path);
@@ -860,7 +873,7 @@ impl ParseApiRootFailureReason {
 mod tests {
     use super::AutoDiscoveryAttempt as A;
     use super::*;
-    use crate::request::RequestMethod;
+    use crate::request::{RequestMethod, endpoint::WpEndpointUrl};
     use rstest::*;
 
     fn api_root_from_link_tag(page_url: &str, head: &str) -> Option<String> {
@@ -1130,6 +1143,39 @@ mod tests {
     fn test_site_directory_url(#[case] site_url: &str, #[case] expected: &str) {
         assert_eq!(
             site_directory_url(&Url::parse(site_url).unwrap()).as_str(),
+            expected
+        );
+    }
+
+    #[rstest]
+    #[case::not_redirected("https://example.com/blog", None, "https://example.com/blog/")]
+    #[case::slash_added(
+        "https://example.com/blog",
+        Some("https://example.com/blog/"),
+        "https://example.com/blog/"
+    )]
+    #[case::other_host(
+        "https://example.com/blog",
+        Some("https://www.example.com/blog"),
+        "https://www.example.com/blog/"
+    )]
+    #[case::other_page(
+        "https://example.com",
+        Some("https://www.example.com/home"),
+        "https://www.example.com/home"
+    )]
+    fn test_homepage_base_url(
+        #[case] site_url: &str,
+        #[case] response_url: Option<&str>,
+        #[case] expected: &str,
+    ) {
+        let homepage = WpNetworkResponse {
+            request_url: WpEndpointUrl(site_url.to_string()),
+            response_url: response_url.map(|url| WpEndpointUrl(url.to_string())),
+            ..crate::unit_test_common::wp_network_response_from_json("", 200)
+        };
+        assert_eq!(
+            homepage_base_url(&homepage, &Url::parse(site_url).unwrap()).as_str(),
             expected
         );
     }

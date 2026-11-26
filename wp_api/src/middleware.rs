@@ -372,6 +372,7 @@ mod tests {
                         request_url: WpEndpointUrl("http://example.com".to_string()),
                         request_method: RequestMethod::GET,
                         request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+                        response_url: None,
                     })
                 },
             };
@@ -406,6 +407,7 @@ mod tests {
                         request_url: WpEndpointUrl("http://example.com".to_string()),
                         request_method: RequestMethod::GET,
                         request_header_map: Arc::new(map.into()),
+                        response_url: None,
                     },
                     WpNetworkRequest::get(WpEndpointUrl("unused".to_string())).into(),
                     None,
@@ -448,6 +450,7 @@ mod tests {
                         request_url: request.url(),
                         request_method: request.method(),
                         request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+                        response_url: None,
                     })
                 }
             }
@@ -525,6 +528,7 @@ mod tests {
                 request_url: WpEndpointUrl("http://example.com".to_string()),
                 request_method: RequestMethod::GET,
                 request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+                response_url: None,
             }
         }
     }

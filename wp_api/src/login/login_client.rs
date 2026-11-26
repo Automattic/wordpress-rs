@@ -6,7 +6,7 @@ use super::{
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, DiscoveredAuthenticationMechanism,
         FetchAndParseApiRootFailure, FindApiRootFailure, ParseApiRootFailureReason,
         ParseHomepageResult, XmlrpcDisabledReason, XmlrpcDiscoveryError, extract_rsd_url,
-        is_xmlrpc_response, parse_rsd_for_xmlrpc, site_directory_url,
+        homepage_base_url, is_xmlrpc_response, parse_rsd_for_xmlrpc,
     },
 };
 use crate::{
@@ -220,11 +220,11 @@ impl WpLoginClient {
     /// Fetches and parses the API root a site advertised, falling back to `<site>/wp-json`
     /// when the advertised address can't be fetched or isn't an API root.
     ///
-    /// The advertised address can be wrong even on a working site: a relative link is
-    /// resolved against the address that was requested, because a response doesn't say where
-    /// a redirect ended up, and a site can advertise a stale address. When the fallback fails
-    /// to fetch or parse too, the advertised address's failure is reported. When the fallback
-    /// gets past fetching and parsing, its failure is reported instead.
+    /// The advertised address can be wrong even on a working site: a site can advertise a stale
+    /// address, and an executor that doesn't report where a redirect ended leaves a relative
+    /// link resolved against the address that was requested. When the fallback fails to fetch
+    /// or parse too, the advertised address's failure is reported. When the fallback gets
+    /// past fetching and parsing, its failure is reported instead.
     async fn fetch_and_parse_advertised_api_root(
         &self,
         parsed_site_url: Arc<ParsedUrl>,
@@ -376,7 +376,7 @@ impl WpLoginClient {
             .map_err(|error| FindApiRootFailure::FetchHomepage { error })?;
         // The `Link` header and the `<link>` tag resolve against the same base, so a relative
         // `wp-json/` means the same address in both.
-        let homepage_url = site_directory_url(&parsed_site_url.inner);
+        let homepage_url = homepage_base_url(&response, &parsed_site_url.inner);
         // First check if we can find and parse the api root from the link header
         if let Some(api_root_url) =
             self.parse_response_link_header_to_find_api_root(&response, &homepage_url)
@@ -649,7 +649,7 @@ impl WpLoginClient {
         // than a missing one.
         let rsd_url = extract_rsd_url(
             &response.body_as_string(),
-            &site_directory_url(&parsed_site_url.inner),
+            &homepage_base_url(&response, &parsed_site_url.inner),
         )
         .ok_or(XmlrpcDiscoveryError::EndpointNotFound)?;
 
@@ -671,7 +671,8 @@ impl WpLoginClient {
                 reason: XmlrpcDisabledReason::ByHost,
             })?;
 
-        parse_rsd_for_xmlrpc(&rsd_response.body_as_string(), &rsd_url)
+        let rsd_document_url = Url::parse(&rsd_response.final_url().0).unwrap_or(rsd_url);
+        parse_rsd_for_xmlrpc(&rsd_response.body_as_string(), &rsd_document_url)
             .ok_or(XmlrpcDiscoveryError::EndpointNotFound)
     }
 }
@@ -772,6 +773,7 @@ mod tests {
                 request_url: request.url.clone(),
                 request_method: request.method.clone(),
                 request_header_map: request.header_map.clone(),
+                response_url: None,
             })
         }
 
@@ -952,10 +954,12 @@ mod tests {
     }
 
     /// Answers each request with the body routed to its URL, or a 404 for any other URL, and
-    /// records the URLs it receives.
+    /// records the URLs it receives. A request to a URL in `redirects` is answered as an
+    /// executor that followed the redirect would answer it.
     #[derive(Default)]
     struct RoutingExecutor {
         routes: Vec<(&'static str, String)>,
+        redirects: Vec<(&'static str, &'static str)>,
         /// The `Link` header each URL answers with.
         link_headers: Vec<(&'static str, &'static str)>,
         requested_urls: Mutex<Vec<String>>,
@@ -971,21 +975,23 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push(request.url.0.clone());
+            let url = self
+                .redirects
+                .iter()
+                .find(|(from, _)| *from == request.url.0)
+                .map_or(request.url.0.as_str(), |(_, to)| to);
             let (body, status_code) = self
                 .routes
                 .iter()
-                .find(|(url, _)| *url == request.url.0)
+                .find(|(route, _)| *route == url)
                 .map_or(("", 404), |(_, body)| (body.as_str(), 200));
             let mut header_map = http::HeaderMap::new();
-            if let Some((_, link)) = self
-                .link_headers
-                .iter()
-                .find(|(url, _)| *url == request.url.0)
-            {
+            if let Some((_, link)) = self.link_headers.iter().find(|(route, _)| *route == url) {
                 header_map.insert(http::header::LINK, http::HeaderValue::from_static(link));
             }
             Ok(WpNetworkResponse {
                 request_url: request.url.clone(),
+                response_url: Some(WpEndpointUrl(url.to_string())),
                 response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
                 ..wp_network_response_from_json(body, status_code)
             })
@@ -1037,10 +1043,21 @@ mod tests {
         homepage: String,
         api_link: &str,
     ) -> (Result<ParsedUrl, XmlrpcDiscoveryError>, Vec<String>) {
-        let executor = Arc::new(RoutingExecutor {
-            routes: vec![(site_url, homepage), (RSD_URL, rsd_body(api_link))],
-            ..Default::default()
-        });
+        xmlrpc_from_rsd_using(
+            site_url,
+            RoutingExecutor {
+                routes: vec![(site_url, homepage), (RSD_URL, rsd_body(api_link))],
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    async fn xmlrpc_from_rsd_using(
+        site_url: &'static str,
+        executor: RoutingExecutor,
+    ) -> (Result<ParsedUrl, XmlrpcDiscoveryError>, Vec<String>) {
+        let executor = Arc::new(executor);
         let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
         let result = client
             .xmlrpc_from_rsd(&ParsedUrl::parse(site_url).unwrap(), None)
@@ -1151,6 +1168,37 @@ mod tests {
         assert_eq!(result.unwrap().url(), XMLRPC_URL);
     }
 
+    // `example.com` redirects to `www.example.com`, and so does the old address of its RSD
+    // document, whose `apiLink` is relative.
+    #[rstest]
+    #[case::relative_rsd_link("/xmlrpc.php?rsd")]
+    #[case::rsd_link_to_the_old_host("https://example.com/xmlrpc.php?rsd")]
+    #[tokio::test]
+    async fn test_xmlrpc_from_rsd_resolves_links_against_where_redirects_ended(#[case] href: &str) {
+        let (result, _) = xmlrpc_from_rsd_using(
+            "https://example.com",
+            RoutingExecutor {
+                routes: vec![
+                    ("https://www.example.com/", homepage_with_rsd_link(href)),
+                    (
+                        "https://www.example.com/xmlrpc.php?rsd",
+                        rsd_body("xmlrpc.php"),
+                    ),
+                ],
+                redirects: vec![
+                    ("https://example.com/", "https://www.example.com/"),
+                    (
+                        "https://example.com/xmlrpc.php?rsd",
+                        "https://www.example.com/xmlrpc.php?rsd",
+                    ),
+                ],
+                ..Default::default()
+            },
+        )
+        .await;
+        assert_eq!(result.unwrap().url(), "https://www.example.com/xmlrpc.php");
+    }
+
     /// An API root for the site at `home`, with application passwords enabled.
     fn api_root_body(home: &str) -> String {
         format!(
@@ -1238,21 +1286,68 @@ mod tests {
         );
     }
 
-    // A `Link` header resolves against the same base as the `<link>` tag. `example.com/wp-json/`
-    // is a REST API root too, of a different site, so resolving against `example.com/blog`
-    // would succeed against the wrong site.
+    // `example.com` redirects to `www.example.com`, and `example.com/wp-json/` loads through the
+    // same redirect, so only resolving against where the redirect ended finds the right host.
     #[rstest]
-    #[case::path_relative("<wp-json/>; rel=\"https://api.w.org/\"")]
-    #[case::dot_relative("<./wp-json/>; rel=\"https://api.w.org/\"")]
+    #[case::link_header(Some(r#"</wp-json/>; rel="https://api.w.org/""#), String::new())]
+    #[case::link_tag(None, homepage_with_api_root_link("/wp-json/"))]
     #[tokio::test]
-    async fn test_api_discovery_resolves_link_header_against_site_directory(
-        #[case] link_header: &'static str,
+    async fn test_api_discovery_resolves_links_against_where_the_homepage_redirected(
+        #[case] link_header: Option<&'static str>,
+        #[case] homepage: String,
     ) {
         let (result, requested_urls) = discover_using(
+            "https://example.com",
+            RoutingExecutor {
+                routes: vec![
+                    ("https://www.example.com/", homepage),
+                    (
+                        "https://www.example.com/wp-json/",
+                        api_root_body("https://www.example.com"),
+                    ),
+                ],
+                redirects: vec![
+                    ("https://example.com/", "https://www.example.com/"),
+                    (
+                        "https://example.com/wp-json/",
+                        "https://www.example.com/wp-json/",
+                    ),
+                ],
+                link_headers: link_header
+                    .map(|link| ("https://www.example.com/", link))
+                    .into_iter()
+                    .collect(),
+                ..Default::default()
+            },
+        )
+        .await;
+        assert_eq!(
+            requested_urls,
+            ["https://example.com/", "https://www.example.com/wp-json/"]
+        );
+        assert_eq!(
+            result.unwrap().api_root_url.url(),
+            "https://www.example.com/wp-json/"
+        );
+    }
+
+    // `wp-json/` on `example.com/blog` stays under `/blog/`, whether or not the server redirects
+    // to add the slash, as it does for a `<link>` tag. Another site answers at the domain root.
+    #[rstest]
+    #[case::redirected_to_add_the_slash(vec![("https://example.com/blog", "https://example.com/blog/")])]
+    #[case::not_redirected(vec![])]
+    #[tokio::test]
+    async fn test_api_discovery_resolves_link_header_against_site_directory(
+        #[case] redirects: Vec<(&'static str, &'static str)>,
+    ) {
+        let homepage_url = redirects
+            .first()
+            .map_or("https://example.com/blog", |(_, to)| *to);
+        let (result, _) = discover_using(
             "https://example.com/blog",
             RoutingExecutor {
                 routes: vec![
-                    ("https://example.com/blog", String::new()),
+                    (homepage_url, String::new()),
                     (
                         "https://example.com/blog/wp-json/",
                         api_root_body("https://example.com/blog"),
@@ -1262,18 +1357,12 @@ mod tests {
                         api_root_body("https://example.com"),
                     ),
                 ],
-                link_headers: vec![("https://example.com/blog", link_header)],
+                redirects,
+                link_headers: vec![(homepage_url, r#"<wp-json/>; rel="https://api.w.org/""#)],
                 ..Default::default()
             },
         )
         .await;
-        assert_eq!(
-            requested_urls,
-            [
-                "https://example.com/blog",
-                "https://example.com/blog/wp-json/"
-            ]
-        );
         assert_eq!(
             result.unwrap().api_root_url.url(),
             "https://example.com/blog/wp-json/"
@@ -1283,8 +1372,7 @@ mod tests {
     #[rstest]
     // An advertised root that answers with something other than an API root.
     #[case::not_found("/wrong/")]
-    // A relative link resolved against the address that was requested, when a redirect took
-    // the homepage somewhere else.
+    // A link to a directory with no API root in it.
     #[case::other_directory("../elsewhere/wp-json/")]
     #[tokio::test]
     async fn test_api_discovery_falls_back_to_wp_json_when_advertised_root_fails(
