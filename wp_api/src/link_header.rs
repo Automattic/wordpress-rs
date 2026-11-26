@@ -44,25 +44,41 @@ pub(crate) fn parse(header: &str) -> Vec<LinkValue> {
             break;
         }
         match parse_entry(&mut cursor, header) {
-            Some(link) => links.push(link),
-            // A target can't contain `<`, so one here starts the next entry. `parse_entry` has
-            // already moved past this entry's own `<`, so this always makes progress.
-            None if cursor.peek() == Some(b'<') => {}
-            None => cursor.skip_to_next_entry(),
+            Ok(link) => links.push(link),
+            Err(Malformed::ResumeHere) => {}
+            Err(Malformed::SkipEntry) => cursor.skip_to_next_entry(),
         }
     }
     links
 }
 
-fn parse_entry(cursor: &mut Cursor<'_>, header: &str) -> Option<LinkValue> {
+/// Where to carry on after an entry that isn't well formed.
+enum Malformed {
+    /// After the next comma that isn't quoted.
+    SkipEntry,
+    /// At the cursor, which is on the `<` that starts the next entry.
+    ResumeHere,
+}
+
+fn parse_entry(cursor: &mut Cursor<'_>, header: &str) -> Result<LinkValue, Malformed> {
     if !cursor.eat(b'<') {
-        return None;
+        return Err(Malformed::SkipEntry);
     }
     let start = cursor.position;
     cursor.advance_until(|b| matches!(b, b'>' | b'<'));
-    let target = header[start..cursor.position].trim_ascii().to_string();
+    let target = &header[start..cursor.position];
+    if cursor.peek() == Some(b'<') {
+        // A target can't contain `<`. After a comma, as in `<a, <b>`, the `>` was left out and
+        // this `<` starts the next entry. Without one, as in `<a<b>`, the entry is malformed.
+        return Err(if target.contains(',') {
+            Malformed::ResumeHere
+        } else {
+            Malformed::SkipEntry
+        });
+    }
+    let target = target.trim_ascii().to_string();
     if !cursor.eat(b'>') {
-        return None;
+        return Err(Malformed::SkipEntry);
     }
 
     let mut rels = None;
@@ -72,7 +88,7 @@ fn parse_entry(cursor: &mut Cursor<'_>, header: &str) -> Option<LinkValue> {
         match cursor.peek() {
             None | Some(b',') => break,
             Some(b';') => cursor.position += 1,
-            Some(_) => return None,
+            Some(_) => return Err(Malformed::SkipEntry),
         }
         cursor.skip_whitespace();
         let name_start = cursor.position;
@@ -85,7 +101,7 @@ fn parse_entry(cursor: &mut Cursor<'_>, header: &str) -> Option<LinkValue> {
         cursor.skip_whitespace();
         let value = if cursor.eat(b'=') {
             cursor.skip_whitespace();
-            cursor.parse_value(header)?
+            cursor.parse_value(header).ok_or(Malformed::SkipEntry)?
         } else {
             String::new()
         };
@@ -97,7 +113,7 @@ fn parse_entry(cursor: &mut Cursor<'_>, header: &str) -> Option<LinkValue> {
         }
     }
 
-    Some(LinkValue {
+    Ok(LinkValue {
         target,
         rels: rels.unwrap_or_default(),
         anchor,
@@ -340,6 +356,7 @@ mod tests {
     #[case::bracketed_comma_in_skipped_entry(r#"junk <https://a/?i=1,2>; rel="a", </b>; rel="b""#)]
     #[case::unclosed_target(r#"<https://a/?x, </b>; rel="b""#)]
     #[case::open_bracket_after_target(r#"</a> <x, </b>; rel="b""#)]
+    #[case::open_bracket_inside_target(r#"<https://a/x<y>; rel="b", </b>; rel="b""#)]
     fn skips_an_entry_that_isnt_well_formed(#[case] header: &str) {
         assert_eq!(parse(header), [link("/b", &["b"])]);
     }
