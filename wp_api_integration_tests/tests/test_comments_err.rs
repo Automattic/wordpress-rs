@@ -68,7 +68,12 @@ async fn create_err_comment_author_invalid() {
                 .build(),
         )
         .await
-        .assert_wp_error(WpErrorCode::CommentAuthorInvalid);
+        // WordPress 7.2 checks that the author is a member of the site before it checks that the
+        // author exists, so a missing author fails that permission check first.
+        .assert_wp_error_one_of(&[
+            WpErrorCode::CommentAuthorInvalid,
+            WpErrorCode::CommentInvalidAuthor,
+        ]);
 }
 
 #[tokio::test]
