@@ -256,7 +256,8 @@ pub struct RootWpJson {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ParseHomepageResult {
-    /// `href` attribute of a link tag if it has `rel` attribute of "<https://api.w.org/>".
+    /// `href` attribute of a link tag if it has `rel` attribute of "<https://api.w.org/>",
+    /// resolved against the page the way a browser would, so it may have been relative.
     /// For example:
     /// <link href="http://localhost/wp-json/" rel="https://api.w.org/">
     pub api_root_url_from_link_tag: Option<Arc<ParsedUrl>>,
@@ -282,8 +283,10 @@ impl ParseHomepageResult {
     const WP_CONTENT: &str = "wp-content";
     const WP_INCLUDES: &str = "wp-includes";
 
-    pub fn parse_response(response_body: &str) -> Self {
-        let html = Html::parse_document(response_body);
+    /// Parses `response_body`, the homepage downloaded from `page_url`.
+    pub fn parse_response(response_body: &str, page_url: &Url) -> Self {
+        let links = HtmlLinks::parse(response_body, page_url);
+        let html = links.document();
 
         // Search for the mention of `wp-content` and `wp-includes` in `link`, `script` & `style`
         // tags
@@ -307,18 +310,15 @@ impl ParseHomepageResult {
                     )
                 },
             );
-        let api_root_url_from_link_tag = html.select(&link_selector).find_map(|e| {
-            if let Some(API_ROOT_LINK_HEADER) = e.attr(Self::HTML_ATTR_REL) {
-                e.attr(Self::HTML_ATTR_HREF)
-                    .and_then(|u| ParsedUrl::parse(u).ok().map(Arc::new))
-            } else {
-                None
-            }
-        });
+        let api_root_url_from_link_tag = links
+            .active_elements(&link_selector)
+            .filter(|e| e.attr(Self::HTML_ATTR_REL) == Some(API_ROOT_LINK_HEADER))
+            .find_map(|e| links.resolve(e.attr(Self::HTML_ATTR_HREF)?))
+            .map(|url| Arc::new(ParsedUrl::new(url)));
 
         Self {
             api_root_url_from_link_tag,
-            has_wordpress_generator_meta_tag: Self::html_has_generator_tag(&html),
+            has_wordpress_generator_meta_tag: Self::html_has_generator_tag(html),
             mentions_wp_content,
             mentions_wp_includes,
         }
@@ -862,6 +862,86 @@ mod tests {
     use super::*;
     use crate::request::RequestMethod;
     use rstest::*;
+
+    fn api_root_from_link_tag(page_url: &str, head: &str) -> Option<String> {
+        let html = format!("<html><head>{head}</head><body></body></html>");
+        ParseHomepageResult::parse_response(&html, &Url::parse(page_url).unwrap())
+            .api_root_url_from_link_tag
+            .map(|url| url.url())
+    }
+
+    #[rstest]
+    #[case::absolute(
+        "https://example.com/",
+        "https://example.com/wp-json/",
+        "https://example.com/wp-json/"
+    )]
+    #[case::root_relative(
+        "https://example.com/",
+        "/wp/wp-json/",
+        "https://example.com/wp/wp-json/"
+    )]
+    #[case::protocol_relative(
+        "https://example.com/",
+        "//example.com/wp-json/",
+        "https://example.com/wp-json/"
+    )]
+    #[case::path_relative(
+        "https://example.com/blog/",
+        "wp-json/",
+        "https://example.com/blog/wp-json/"
+    )]
+    #[case::plain_permalinks(
+        "https://example.com/",
+        "/?rest_route=/",
+        "https://example.com/?rest_route=/"
+    )]
+    #[case::surrounding_whitespace(
+        "https://example.com/",
+        " /wp-json/ ",
+        "https://example.com/wp-json/"
+    )]
+    fn test_api_root_link_tag_resolves_against_page(
+        #[case] page_url: &str,
+        #[case] href: &str,
+        #[case] expected: &str,
+    ) {
+        let head = format!(r#"<link rel="https://api.w.org/" href="{href}" />"#);
+        assert_eq!(
+            api_root_from_link_tag(page_url, &head).as_deref(),
+            Some(expected)
+        );
+    }
+
+    #[test]
+    fn test_api_root_link_tag_resolves_against_base_element() {
+        let head = r#"<base href="/wp/"><link rel="https://api.w.org/" href="wp-json/" />"#;
+        assert_eq!(
+            api_root_from_link_tag("https://example.com/", head).as_deref(),
+            Some("https://example.com/wp/wp-json/")
+        );
+    }
+
+    #[test]
+    fn test_api_root_link_tag_skips_unusable_link_for_the_next_one() {
+        let head = r#"<link rel="https://api.w.org/" href="" />
+            <link rel="https://api.w.org/" href="javascript:void(0)" />
+            <template><link rel="https://api.w.org/" href="/inert/" /></template>
+            <link rel="https://api.w.org/" href="/wp-json/" />"#;
+        assert_eq!(
+            api_root_from_link_tag("https://example.com/", head).as_deref(),
+            Some("https://example.com/wp-json/")
+        );
+    }
+
+    #[rstest]
+    #[case::none("")]
+    #[case::empty(r#"<link rel="https://api.w.org/" href="" />"#)]
+    #[case::data(r#"<link rel="https://api.w.org/" href="data:text/plain,x" />"#)]
+    #[case::other_rel(r#"<link rel="alternate" href="/feed/" />"#)]
+    fn test_api_root_link_tag_missing(#[case] head: &str) {
+        assert_eq!(api_root_from_link_tag("https://example.com/", head), None);
+    }
 
     #[rstest]
     #[case::localhost("localhost", vec![A::with_user_input_attempt_type("localhost"), A::with_auto_stripped_https_attempt_type("https://localhost")])]
