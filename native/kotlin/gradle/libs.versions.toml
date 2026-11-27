@@ -19,7 +19,7 @@ kotlinx-serialization-json = "1.6.3"
 landscapist = "2.6.1"
 lifecycle = "2.10.0"
 okHttp = "5.4.0"
-navigationCompose = "2.9.2"
+navigationCompose = "2.10.0"
 publish-to-s3-plugin = "0.10.0"
 
 [libraries]
