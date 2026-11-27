@@ -42,6 +42,12 @@ pub enum LocalContentError {
     NotAJsonObject { field: String },
     #[error("No editor session with id {}", id.0)]
     EditorSessionNotFound { id: EditorSessionId },
+    #[error("The editor session already has a request with id {request_id}")]
+    EditorRequestAlreadyRecorded { request_id: String },
+    #[error("The editor session has no request with id {request_id}")]
+    EditorRequestNotFound { request_id: String },
+    #[error("The editor session's request {request_id} already has a response or a failure")]
+    EditorRequestAlreadyCompleted { request_id: String },
 }
 
 impl From<rusqlite::Error> for LocalContentError {

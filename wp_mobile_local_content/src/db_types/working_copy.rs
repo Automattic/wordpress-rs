@@ -158,8 +158,8 @@ pub struct PostWorkingCopy {
     pub remote_target: WorkingCopyRemoteTarget,
     /// When the working copy was created, as an ISO 8601 UTC timestamp.
     pub created_at: String,
-    /// When the fields were last saved, as an ISO 8601 UTC timestamp. Until
-    /// the first save, it's the same as `created_at`.
+    /// When its newest version was saved, as an ISO 8601 UTC timestamp. Until
+    /// a save changes something, it's the same as `created_at`.
     pub updated_at: String,
 }
 
@@ -172,8 +172,8 @@ pub struct PageWorkingCopy {
     pub remote_target: WorkingCopyRemoteTarget,
     /// When the working copy was created, as an ISO 8601 UTC timestamp.
     pub created_at: String,
-    /// When the fields were last saved, as an ISO 8601 UTC timestamp. Until
-    /// the first save, it's the same as `created_at`.
+    /// When its newest version was saved, as an ISO 8601 UTC timestamp. Until
+    /// a save changes something, it's the same as `created_at`.
     pub updated_at: String,
 }
 
@@ -330,40 +330,37 @@ pub(crate) fn date_from_timestamp(seconds: i64) -> Result<WpGmtDateTime, FromSql
         .ok_or_else(|| FromSqlError::Other(format!("Timestamp out of range: {seconds}").into()))
 }
 
-/// Column indexes for the working_copies table.
+/// Column indexes for the working_copy_field_sets table.
 /// These must match the order of columns in the CREATE TABLE statement.
+///
+/// `rowid` (index 0) and `working_copy_rowid` (index 1) are matched in the
+/// WHERE clause and never read.
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum WorkingCopyColumn {
-    Rowid = 0,
-    Uuid = 1,
-    // `kind` (index 2) is matched in the WHERE clause and never read.
-    Title = 3,
-    Content = 4,
-    Excerpt = 5,
-    Slug = 6,
-    Status = 7,
-    Password = 8,
-    PublishDate = 9,
-    AuthorId = 10,
-    FeaturedMediaId = 11,
-    CommentStatus = 12,
-    PingStatus = 13,
-    CreatedAt = 14,
-    UpdatedAt = 15,
-    Template = 16,
-    MenuOrder = 17,
+pub(crate) enum FieldSetColumn {
+    Title = 2,
+    Excerpt = 3,
+    Slug = 4,
+    Status = 5,
+    Password = 6,
+    PublishDate = 7,
+    AuthorId = 8,
+    FeaturedMediaId = 9,
+    CommentStatus = 10,
+    PingStatus = 11,
+    Template = 12,
+    MenuOrder = 13,
 }
 
-impl ColumnIndex for WorkingCopyColumn {
+impl ColumnIndex for FieldSetColumn {
     fn as_index(&self) -> usize {
         *self as usize
     }
 }
 
-/// Column indexes for the post_working_copy_fields table.
+/// Column indexes for the post_field_sets table.
 ///
-/// `working_copy_rowid` (index 0) is matched in the WHERE clause and never read.
+/// `field_set_rowid` (index 0) is matched in the WHERE clause and never read.
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PostFieldsColumn {
@@ -381,9 +378,9 @@ impl ColumnIndex for PostFieldsColumn {
     }
 }
 
-/// Column indexes for the page_working_copy_fields table.
+/// Column indexes for the page_field_sets table.
 ///
-/// `working_copy_rowid` (index 0) is matched in the WHERE clause and never read.
+/// `field_set_rowid` (index 0) is matched in the WHERE clause and never read.
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PageFieldsColumn {

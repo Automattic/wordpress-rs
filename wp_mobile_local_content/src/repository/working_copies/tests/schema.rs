@@ -19,30 +19,29 @@ fn column_names(conn: &Connection, table: &str) -> Vec<String> {
 fn test_column_enums_match_schema() {
     let conn = migrated_connection();
 
-    let columns = column_names(&conn, WORKING_COPIES);
+    assert_eq!(
+        column_names(&conn, WORKING_COPIES),
+        ["rowid", "uuid", "kind", "created_at"]
+    );
+
+    let columns = column_names(&conn, FIELD_SETS);
     for (column, name) in [
-        (WorkingCopyColumn::Rowid, "rowid"),
-        (WorkingCopyColumn::Uuid, "uuid"),
-        (WorkingCopyColumn::Title, "title"),
-        (WorkingCopyColumn::Content, "content"),
-        (WorkingCopyColumn::Excerpt, "excerpt"),
-        (WorkingCopyColumn::Slug, "slug"),
-        (WorkingCopyColumn::Status, "status"),
-        (WorkingCopyColumn::Password, "password"),
-        (WorkingCopyColumn::PublishDate, "publish_date"),
-        (WorkingCopyColumn::AuthorId, "author_id"),
-        (WorkingCopyColumn::FeaturedMediaId, "featured_media_id"),
-        (WorkingCopyColumn::CommentStatus, "comment_status"),
-        (WorkingCopyColumn::PingStatus, "ping_status"),
-        (WorkingCopyColumn::CreatedAt, "created_at"),
-        (WorkingCopyColumn::UpdatedAt, "updated_at"),
-        (WorkingCopyColumn::Template, "template"),
-        (WorkingCopyColumn::MenuOrder, "menu_order"),
+        (FieldSetColumn::Title, "title"),
+        (FieldSetColumn::Excerpt, "excerpt"),
+        (FieldSetColumn::Slug, "slug"),
+        (FieldSetColumn::Status, "status"),
+        (FieldSetColumn::Password, "password"),
+        (FieldSetColumn::PublishDate, "publish_date"),
+        (FieldSetColumn::AuthorId, "author_id"),
+        (FieldSetColumn::FeaturedMediaId, "featured_media_id"),
+        (FieldSetColumn::CommentStatus, "comment_status"),
+        (FieldSetColumn::PingStatus, "ping_status"),
+        (FieldSetColumn::Template, "template"),
+        (FieldSetColumn::MenuOrder, "menu_order"),
     ] {
         assert_eq!(columns[column.as_index()], name);
     }
-    assert_eq!(columns[2], "kind");
-    assert_eq!(columns.len(), 18);
+    assert_eq!(columns.len(), 14);
 
     let columns = column_names(&conn, POST_FIELDS);
     for (column, name) in [
@@ -92,26 +91,23 @@ fn test_column_enums_match_schema() {
 #[test]
 fn test_schema_rejects_impossible_states() {
     let mut conn = migrated_connection();
-    let id = insert_post(
+    insert_post(
         &mut conn,
         &simple_post("Title"),
         &self_hosted_new_post_target(),
     );
 
-    let empty_status = conn.execute(
-        &format!("UPDATE {WORKING_COPIES} SET status = '' WHERE uuid = ?"),
-        [&id],
-    );
+    let empty_status = conn.execute(&format!("UPDATE {FIELD_SETS} SET status = ''"), []);
     let private_with_password = conn.execute(
-        &format!(
-            "UPDATE {WORKING_COPIES} SET status = 'private', password = 'secret' WHERE uuid = ?"
-        ),
-        [&id],
-    );
-    let tags_not_an_array = conn.execute(
-        &format!("UPDATE {POST_FIELDS} SET tags = '{{\"new\": {{\"name\": \"a\"}}}}'"),
+        &format!("UPDATE {FIELD_SETS} SET status = 'private', password = 'secret'"),
         [],
     );
+    let tags_not_an_array = conn.execute(
+        &format!("UPDATE {POST_FIELDS} SET tag_ids = '{{\"new\": {{\"name\": \"a\"}}}}'"),
+        [],
+    );
+    let version_without_content =
+        conn.execute(&format!("UPDATE {VERSIONS} SET content_rowid = 12345"), []);
     let remote_post_without_base = conn.execute(
         &format!("UPDATE {REMOTE_TARGETS} SET remote_post_id = 5"),
         [],
@@ -125,6 +121,7 @@ fn test_schema_rejects_impossible_states() {
         ("an empty status", empty_status),
         ("a private post with a password", private_with_password),
         ("tags that aren't an array", tags_not_an_array),
+        ("a version without its content", version_without_content),
         ("remote post without base", remote_post_without_base),
         (
             "two sites without a site ID at one URL",
@@ -135,9 +132,10 @@ fn test_schema_rejects_impossible_states() {
     }
 }
 
-/// A working copy's fields and remote target are deleted with it, and a
-/// remote target can't exist without one. A site can't be deleted while a
-/// working copy belongs to it.
+/// A working copy's versions, their rows and its remote target are deleted
+/// with it, and a remote target can't exist without one. A site can't be
+/// deleted while a working copy belongs to it, and a version can't be deleted
+/// while another version has it as its parent.
 #[test]
 fn test_relationships_are_deleted_with_their_working_copy_and_not_without_one() {
     let mut conn = migrated_connection();
@@ -146,7 +144,16 @@ fn test_relationships_are_deleted_with_their_working_copy_and_not_without_one() 
         &detailed_post(),
         &wordpress_com_target_editing(99),
     );
+    let tx = conn.transaction().expect("Failed to begin transaction");
+    WorkingCopyRepository
+        .update_post(&tx, &id, &simple_post("Edited"), None)
+        .expect("Update should succeed");
+    tx.commit().expect("Commit should succeed");
 
+    let delete_parent = conn.execute(
+        &format!("DELETE FROM {VERSIONS} WHERE parent_rowid IS NULL"),
+        [],
+    );
     let orphan_target = conn.execute(
         &format!(
             "INSERT INTO {REMOTE_TARGETS} (working_copy_rowid, site_rowid)
@@ -162,6 +169,10 @@ fn test_relationships_are_deleted_with_their_working_copy_and_not_without_one() 
     .expect("Delete should succeed");
 
     assert!(
+        delete_parent.is_err(),
+        "A version must not be deleted while it's another version's parent"
+    );
+    assert!(
         orphan_target.is_err(),
         "A remote target must not exist without a working copy"
     );
@@ -169,6 +180,7 @@ fn test_relationships_are_deleted_with_their_working_copy_and_not_without_one() 
         delete_targeted_site.is_err(),
         "A site must not be deleted while a working copy targets it"
     );
-    assert_eq!(count_rows(&conn, POST_FIELDS), 0);
-    assert_eq!(count_rows(&conn, REMOTE_TARGETS), 0);
+    for table in [VERSIONS, CONTENTS, FIELD_SETS, POST_FIELDS, REMOTE_TARGETS] {
+        assert_eq!(count_rows(&conn, table), 0, "{table} should be empty");
+    }
 }

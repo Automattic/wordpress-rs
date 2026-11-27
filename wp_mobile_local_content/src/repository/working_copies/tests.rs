@@ -4,7 +4,11 @@
 use super::*;
 use crate::{
     MIGRATIONS,
-    db_types::working_copy::{StatusSetting, WorkingCopyId, date_from_timestamp},
+    db_types::{
+        editor_session::EditorSessionId,
+        working_copy::{StatusSetting, WorkingCopyId, date_from_timestamp},
+        working_copy_version::WorkingCopyVersion,
+    },
 };
 use rusqlite::Connection;
 use std::sync::Arc;
@@ -20,6 +24,7 @@ use wp_api::{
 use wp_mobile_sqlite::MigrationManager;
 
 mod fields;
+mod history;
 mod remote_posts;
 mod schema;
 mod sites;

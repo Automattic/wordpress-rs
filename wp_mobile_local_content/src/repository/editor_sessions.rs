@@ -1,46 +1,63 @@
+use std::collections::HashMap;
+
 use rusqlite::{OptionalExtension, Row, types::Type};
 
 use crate::{
     LocalContentError,
     db_types::{
-        editor_session::{BaseMismatch, EditorSession, EditorSessionId, UnconfirmedPush},
+        editor_session::{
+            EditorRequest, EditorRequestOutcome, EditorRequestRecord, EditorResponse,
+            EditorSession, EditorSessionId,
+        },
         working_copy::{WorkingCopyId, date_from_timestamp},
-        working_copy_remote_target::RemotePostReference,
     },
     repository::QueryExecutor,
 };
-use wp_api::posts::PostId;
 
 const EDITOR_SESSIONS: &str = "editor_sessions";
-const UNCONFIRMED_PUSHES: &str = "editor_session_unconfirmed_pushes";
-const BASE_MISMATCHES: &str = "editor_session_base_mismatches";
+const REQUESTS: &str = "editor_session_requests";
 const WORKING_COPIES: &str = "working_copies";
 
 /// The current time as a Unix timestamp in seconds, in SQL.
 const NOW: &str = "CAST(strftime('%s', 'now') AS INTEGER)";
 
-/// Repository for editor sessions and their unconfirmed pushes.
+/// Headers that carry credentials. They're left out of every stored request
+/// and response, so the database never holds a credential.
+const CREDENTIAL_HEADERS: [&str; 5] = [
+    "authorization",
+    "proxy-authorization",
+    "cookie",
+    "set-cookie",
+    "x-wp-nonce",
+];
+
+/// Repository for editor sessions and the requests the editor reported in
+/// them.
 ///
-/// A session belongs to a working copy and is deleted with it.
+/// A session belongs to a working copy and is deleted with it. Its requests
+/// are deleted with it.
 pub struct EditorSessionRepository;
 
 impl EditorSessionRepository {
     /// Insert a session for `working_copy_id`, started now, and return its newly
     /// generated ID.
     ///
+    /// `editor_identity` is stored as given.
+    ///
     /// Fails with `WorkingCopyNotFound` if no working copy has the ID.
     pub fn insert(
         &self,
         executor: &impl QueryExecutor,
         working_copy_id: &WorkingCopyId,
+        editor_identity: Option<&str>,
     ) -> Result<EditorSessionId, LocalContentError> {
         let id = EditorSessionId::generate();
         let inserted = executor.execute(
             &format!(
-                "INSERT INTO {EDITOR_SESSIONS} (uuid, working_copy_rowid, started_at)
-                 SELECT ?, rowid, {NOW} FROM {WORKING_COPIES} WHERE uuid = ?"
+                "INSERT INTO {EDITOR_SESSIONS} (uuid, working_copy_rowid, editor_identity, started_at)
+                 SELECT ?, rowid, ?, {NOW} FROM {WORKING_COPIES} WHERE uuid = ?"
             ),
-            rusqlite::params![id, working_copy_id],
+            rusqlite::params![id, editor_identity, working_copy_id],
         )?;
         if inserted == 0 {
             return Err(LocalContentError::WorkingCopyNotFound {
@@ -82,72 +99,123 @@ impl EditorSessionRepository {
         Ok(updated > 0)
     }
 
-    /// Record a push sent now that has no answer yet, replacing the one the
-    /// session had.
+    /// Record that the editor sent `request` during the session, now.
     ///
-    /// `remote_post` is the post the push updates, with its base version, or
-    /// `None` if the push creates the post. `body` must be a JSON object.
-    /// Returns `false` if no session has the ID.
-    pub fn record_unconfirmed_push(
+    /// Header names are stored in lowercase, and credential headers are left
+    /// out. Fails with `EditorSessionNotFound` if no session has the ID, and
+    /// with `EditorRequestAlreadyRecorded` if the session has a request with
+    /// the same `request_id`.
+    pub fn record_request_sent(
         &self,
         executor: &impl QueryExecutor,
         id: &EditorSessionId,
-        remote_post: Option<RemotePostReference>,
-        body: &str,
-    ) -> Result<bool, LocalContentError> {
+        request: &EditorRequest,
+    ) -> Result<(), LocalContentError> {
+        let session_rowid = select_rowid(executor, id)?
+            .ok_or_else(|| LocalContentError::EditorSessionNotFound { id: id.clone() })?;
         let inserted = executor.execute(
             &format!(
-                "INSERT OR REPLACE INTO {UNCONFIRMED_PUSHES}
-                     (editor_session_rowid, remote_post_id, base_modified_gmt, sent_at, body)
-                 SELECT rowid, ?, ?, {NOW}, ? FROM {EDITOR_SESSIONS} WHERE uuid = ?"
+                "INSERT INTO {REQUESTS}
+                     (editor_session_rowid, request_id, method, path, request_headers, request_body, sent_at)
+                 VALUES (?, ?, ?, ?, ?, ?, {NOW})
+                 ON CONFLICT (editor_session_rowid, request_id) DO NOTHING"
             ),
             rusqlite::params![
-                remote_post.map(|remote| remote.post_id.0),
-                remote_post.map(|remote| remote.base_modified_gmt.0.timestamp()),
-                body,
-                id,
+                session_rowid,
+                request.request_id,
+                request.method,
+                request.path,
+                headers_to_json(&request.headers),
+                request.body,
             ],
         )?;
-        Ok(inserted > 0)
+        if inserted == 0 {
+            return Err(LocalContentError::EditorRequestAlreadyRecorded {
+                request_id: request.request_id.clone(),
+            });
+        }
+        Ok(())
     }
 
-    /// Delete the session's unconfirmed push, if it has one.
+    /// Record the response to a request the session recorded as sent, now.
     ///
-    /// Returns `false` if no session has the ID.
-    pub fn clear_unconfirmed_push(
+    /// Header names are stored in lowercase, and credential headers are left
+    /// out. Fails with `EditorSessionNotFound` if no session has the ID,
+    /// `EditorRequestNotFound` if the session has no request with
+    /// `request_id`, and `EditorRequestAlreadyCompleted` if the request
+    /// already has a response or a failure.
+    pub fn record_request_response(
         &self,
         executor: &impl QueryExecutor,
         id: &EditorSessionId,
-    ) -> Result<bool, LocalContentError> {
-        let Some(rowid) = select_rowid(executor, id)? else {
-            return Ok(false);
-        };
+        request_id: &str,
+        response: &EditorResponse,
+    ) -> Result<(), LocalContentError> {
+        let request_rowid = select_open_request_rowid(executor, id, request_id)?;
         executor.execute(
-            &format!("DELETE FROM {UNCONFIRMED_PUSHES} WHERE editor_session_rowid = ?"),
-            [rowid],
+            &format!(
+                "UPDATE {REQUESTS}
+                 SET status_code = ?, response_headers = ?, response_body = ?, completed_at = {NOW}
+                 WHERE rowid = ?"
+            ),
+            rusqlite::params![
+                response.status_code,
+                headers_to_json(&response.headers),
+                response.body,
+                request_rowid,
+            ],
         )?;
-        Ok(true)
+        Ok(())
     }
 
-    /// Record that the editor's version of the post differed from the
-    /// server's in `fields`, now, replacing the mismatch the session had.
+    /// Record that a request the session recorded as sent got no answer, now.
     ///
-    /// Returns `false` if no session has the ID.
-    pub fn record_base_mismatch(
+    /// Fails as `record_request_response` does.
+    pub fn record_request_failure(
         &self,
         executor: &impl QueryExecutor,
         id: &EditorSessionId,
-        fields: &[String],
-    ) -> Result<bool, LocalContentError> {
-        let fields = serde_json::to_string(fields).expect("A list of strings always serializes");
-        let inserted = executor.execute(
-            &format!(
-                "INSERT OR REPLACE INTO {BASE_MISMATCHES} (editor_session_rowid, detected_at, fields)
-                 SELECT rowid, {NOW}, ? FROM {EDITOR_SESSIONS} WHERE uuid = ?"
-            ),
-            rusqlite::params![fields, id],
+        request_id: &str,
+        reason: &str,
+    ) -> Result<(), LocalContentError> {
+        let request_rowid = select_open_request_rowid(executor, id, request_id)?;
+        executor.execute(
+            &format!("UPDATE {REQUESTS} SET failure = ?, completed_at = {NOW} WHERE rowid = ?"),
+            rusqlite::params![reason, request_rowid],
         )?;
-        Ok(inserted > 0)
+        Ok(())
+    }
+
+    /// Select a request the session recorded, or `None` if it has none with
+    /// `request_id`.
+    pub fn select_request(
+        &self,
+        executor: &impl QueryExecutor,
+        id: &EditorSessionId,
+        request_id: &str,
+    ) -> Result<Option<EditorRequestRecord>, LocalContentError> {
+        let mut stmt = executor.prepare(&format!(
+            "{SELECT_REQUESTS} WHERE s.uuid = ? AND r.request_id = ?"
+        ))?;
+        Ok(stmt
+            .query_row(rusqlite::params![id, request_id], request_from_row)
+            .optional()?)
+    }
+
+    /// Select every request the session recorded, in the order the editor
+    /// reported sending them.
+    pub fn select_requests(
+        &self,
+        executor: &impl QueryExecutor,
+        id: &EditorSessionId,
+    ) -> Result<Vec<EditorRequestRecord>, LocalContentError> {
+        let mut stmt = executor.prepare(&format!(
+            "{SELECT_REQUESTS} WHERE s.uuid = ? ORDER BY r.rowid"
+        ))?;
+        let requests = stmt
+            .query_map([id], request_from_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(requests)
     }
 
     /// Select a session by its ID, or `None` if no session has it.
@@ -179,63 +247,111 @@ impl EditorSessionRepository {
 
 /// The columns `session_from_row` reads, in its order.
 const SELECT_SESSIONS: &str = "
-    SELECT s.uuid, w.uuid, s.started_at, s.last_recorded_at, s.ended_at,
-           p.remote_post_id, p.base_modified_gmt, p.sent_at, p.body,
-           m.detected_at, m.fields
+    SELECT s.uuid, w.uuid, s.editor_identity, s.started_at, s.last_recorded_at, s.ended_at
     FROM editor_sessions s
-    JOIN working_copies w ON w.rowid = s.working_copy_rowid
-    LEFT JOIN editor_session_unconfirmed_pushes p ON p.editor_session_rowid = s.rowid
-    LEFT JOIN editor_session_base_mismatches m ON m.editor_session_rowid = s.rowid";
+    JOIN working_copies w ON w.rowid = s.working_copy_rowid";
+
+/// The columns `request_from_row` reads, in its order.
+const SELECT_REQUESTS: &str = "
+    SELECT r.request_id, r.method, r.path, r.request_headers, r.request_body, r.sent_at,
+           r.status_code, r.response_headers, r.response_body, r.failure, r.completed_at
+    FROM editor_session_requests r
+    JOIN editor_sessions s ON s.rowid = r.editor_session_rowid";
+
+fn date_at(row: &Row, index: usize) -> rusqlite::Result<Option<wp_api::date::WpGmtDateTime>> {
+    row.get::<_, Option<i64>>(index)?
+        .map(|seconds| {
+            date_from_timestamp(seconds).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(index, Type::Integer, Box::new(e))
+            })
+        })
+        .transpose()
+}
+
+fn required_date_at(
+    row: &Row,
+    index: usize,
+    name: &str,
+) -> rusqlite::Result<wp_api::date::WpGmtDateTime> {
+    date_at(row, index)?.ok_or(rusqlite::Error::InvalidColumnType(
+        index,
+        name.to_string(),
+        Type::Null,
+    ))
+}
 
 fn session_from_row(row: &Row) -> rusqlite::Result<EditorSession> {
-    let date = |index: usize| -> rusqlite::Result<_> {
-        row.get::<_, Option<i64>>(index)?
-            .map(|seconds| {
-                date_from_timestamp(seconds).map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(index, Type::Integer, Box::new(e))
+    Ok(EditorSession {
+        id: row.get(0)?,
+        working_copy_id: row.get(1)?,
+        editor_identity: row.get(2)?,
+        started_at: required_date_at(row, 3, "started_at")?,
+        last_recorded_at: date_at(row, 4)?,
+        ended_at: date_at(row, 5)?,
+    })
+}
+
+fn request_from_row(row: &Row) -> rusqlite::Result<EditorRequestRecord> {
+    let headers = |index: usize| -> rusqlite::Result<Option<HashMap<String, String>>> {
+        row.get::<_, Option<String>>(index)?
+            .map(|json| {
+                serde_json::from_str(&json).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(index, Type::Text, Box::new(e))
                 })
             })
             .transpose()
     };
-    let remote_post_id: Option<i64> = row.get(5)?;
-    let unconfirmed_push = match date(7)? {
-        Some(sent_at) => Some(UnconfirmedPush {
-            remote_post: remote_post_id
-                .zip(date(6)?)
-                .map(|(post_id, base_modified_gmt)| RemotePostReference {
-                    post_id: PostId(post_id),
-                    base_modified_gmt,
-                }),
-            sent_at,
-            body: row.get(8)?,
+    let status_code: Option<u32> = row.get(6)?;
+    let failure: Option<String> = row.get(9)?;
+    let outcome = match (status_code, failure) {
+        (Some(status_code), _) => Some(EditorRequestOutcome::Response {
+            response: EditorResponse {
+                status_code,
+                headers: headers(7)?.unwrap_or_default(),
+                body: row.get::<_, Option<Vec<u8>>>(8)?.unwrap_or_default(),
+            },
+            recorded_at: required_date_at(row, 10, "completed_at")?,
         }),
-        None => None,
+        (None, Some(reason)) => Some(EditorRequestOutcome::Failure {
+            reason,
+            recorded_at: required_date_at(row, 10, "completed_at")?,
+        }),
+        (None, None) => None,
     };
-    let base_mismatch = match date(9)? {
-        Some(detected_at) => {
-            let fields: String = row.get(10)?;
-            Some(BaseMismatch {
-                detected_at,
-                fields: serde_json::from_str(&fields).map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(10, Type::Text, Box::new(e))
-                })?,
-            })
-        }
-        None => None,
-    };
-    Ok(EditorSession {
-        id: row.get(0)?,
-        working_copy_id: row.get(1)?,
-        started_at: date(2)?.ok_or(rusqlite::Error::InvalidColumnType(
-            2,
-            "started_at".to_string(),
-            Type::Null,
-        ))?,
-        last_recorded_at: date(3)?,
-        ended_at: date(4)?,
-        unconfirmed_push,
-        base_mismatch,
+    Ok(EditorRequestRecord {
+        request: EditorRequest {
+            request_id: row.get(0)?,
+            method: row.get(1)?,
+            path: row.get(2)?,
+            headers: headers(3)?.unwrap_or_default(),
+            body: row.get(4)?,
+        },
+        sent_at: required_date_at(row, 5, "sent_at")?,
+        outcome,
     })
+}
+
+/// `headers` as a JSON object, with lowercase names and without credential
+/// headers. Values of names that differ only in case are joined with `, `.
+fn headers_to_json(headers: &HashMap<String, String>) -> String {
+    let stored = headers
+        .iter()
+        .map(|(name, value)| (name.to_ascii_lowercase(), value))
+        .filter(|(name, _)| !CREDENTIAL_HEADERS.contains(&name.as_str()))
+        .fold(
+            std::collections::BTreeMap::<String, String>::new(),
+            |mut stored, (name, value)| {
+                stored
+                    .entry(name)
+                    .and_modify(|joined| {
+                        joined.push_str(", ");
+                        joined.push_str(value);
+                    })
+                    .or_insert_with(|| value.clone());
+                stored
+            },
+        );
+    serde_json::to_string(&stored).expect("A map of strings always serializes")
 }
 
 fn select_rowid(
@@ -246,6 +362,35 @@ fn select_rowid(
         "SELECT rowid FROM {EDITOR_SESSIONS} WHERE uuid = ?"
     ))?;
     Ok(stmt.query_row([id], |row| row.get(0)).optional()?)
+}
+
+/// The rowid of the session's request `request_id`, which must have neither a
+/// response nor a failure yet.
+fn select_open_request_rowid(
+    executor: &impl QueryExecutor,
+    id: &EditorSessionId,
+    request_id: &str,
+) -> Result<i64, LocalContentError> {
+    let session_rowid = select_rowid(executor, id)?
+        .ok_or_else(|| LocalContentError::EditorSessionNotFound { id: id.clone() })?;
+    let mut stmt = executor.prepare(&format!(
+        "SELECT rowid, completed_at IS NOT NULL FROM {REQUESTS}
+         WHERE editor_session_rowid = ? AND request_id = ?"
+    ))?;
+    match stmt
+        .query_row(rusqlite::params![session_rowid, request_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, bool>(1)?))
+        })
+        .optional()?
+    {
+        Some((rowid, false)) => Ok(rowid),
+        Some((_, true)) => Err(LocalContentError::EditorRequestAlreadyCompleted {
+            request_id: request_id.to_string(),
+        }),
+        None => Err(LocalContentError::EditorRequestNotFound {
+            request_id: request_id.to_string(),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -314,6 +459,12 @@ mod tests {
         (conn, id)
     }
 
+    fn insert_session(conn: &Connection, working_copy_id: &WorkingCopyId) -> EditorSessionId {
+        EditorSessionRepository
+            .insert(conn, working_copy_id, None)
+            .expect("Insert should succeed")
+    }
+
     fn select(conn: &Connection, id: &EditorSessionId) -> EditorSession {
         EditorSessionRepository
             .select(conn, id)
@@ -321,23 +472,39 @@ mod tests {
             .expect("The session should exist")
     }
 
+    fn request(request_id: &str, headers: &[(&str, &str)]) -> EditorRequest {
+        EditorRequest {
+            request_id: request_id.to_string(),
+            method: "PUT".to_string(),
+            path: "/wp/v2/posts/42".to_string(),
+            headers: headers
+                .iter()
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect(),
+            body: Some(br#"{"title":"Saved"}"#.to_vec()),
+        }
+    }
+
+    fn requests(conn: &Connection, id: &EditorSessionId) -> Vec<EditorRequestRecord> {
+        EditorSessionRepository
+            .select_requests(conn, id)
+            .expect("Select should succeed")
+    }
+
     #[test]
     fn test_session_records_what_happened_in_it() {
         let (conn, working_copy_id) = connection_with_working_copy();
 
         let id = EditorSessionRepository
-            .insert(&conn, &working_copy_id)
+            .insert(&conn, &working_copy_id, Some("user-7@example.com"))
             .expect("Insert should succeed");
         let started = select(&conn, &id);
         assert_eq!(started.working_copy_id, working_copy_id);
         assert_eq!(
-            (
-                started.last_recorded_at,
-                started.ended_at,
-                started.unconfirmed_push
-            ),
-            (None, None, None)
+            started.editor_identity.as_deref(),
+            Some("user-7@example.com")
         );
+        assert_eq!((started.last_recorded_at, started.ended_at), (None, None));
 
         assert!(
             EditorSessionRepository
@@ -358,12 +525,8 @@ mod tests {
     #[test]
     fn test_only_sessions_that_have_not_ended_are_unfinished() {
         let (conn, working_copy_id) = connection_with_working_copy();
-        let ended = EditorSessionRepository
-            .insert(&conn, &working_copy_id)
-            .expect("Insert should succeed");
-        let unfinished = EditorSessionRepository
-            .insert(&conn, &working_copy_id)
-            .expect("Insert should succeed");
+        let ended = insert_session(&conn, &working_copy_id);
+        let unfinished = insert_session(&conn, &working_copy_id);
         EditorSessionRepository
             .end(&conn, &ended)
             .expect("Ending should succeed");
@@ -379,54 +542,129 @@ mod tests {
     }
 
     #[test]
-    fn test_unconfirmed_push_is_replaced_and_cleared() {
+    fn test_requests_are_kept_in_order_with_what_came_back() {
         let (conn, working_copy_id) = connection_with_working_copy();
-        let id = EditorSessionRepository
-            .insert(&conn, &working_copy_id)
-            .expect("Insert should succeed");
-        let remote_post = RemotePostReference {
-            post_id: PostId(42),
-            base_modified_gmt: date_from_timestamp(1_700_000_000).expect("Timestamp is in range"),
+        let id = insert_session(&conn, &working_copy_id);
+
+        for request_id in ["save", "read", "lost"] {
+            EditorSessionRepository
+                .record_request_sent(&conn, &id, &request(request_id, &[]))
+                .expect("Recording should succeed");
+        }
+        EditorSessionRepository
+            .record_request_failure(&conn, &id, "read", "The device is offline")
+            .expect("Recording should succeed");
+        let response = EditorResponse {
+            status_code: 200,
+            headers: HashMap::new(),
+            body: br#"{"id":42}"#.to_vec(),
         };
-
         EditorSessionRepository
-            .record_unconfirmed_push(&conn, &id, None, r#"{"title":"Create"}"#)
+            .record_request_response(&conn, &id, "save", &response)
             .expect("Recording should succeed");
-        EditorSessionRepository
-            .record_unconfirmed_push(&conn, &id, Some(remote_post), r#"{"title":"Update"}"#)
-            .expect("Recording should succeed");
-        let push = select(&conn, &id)
-            .unconfirmed_push
-            .expect("The push should be recorded");
-        assert_eq!(push.remote_post, Some(remote_post));
-        assert_eq!(push.body, r#"{"title":"Update"}"#);
 
-        EditorSessionRepository
-            .clear_unconfirmed_push(&conn, &id)
-            .expect("Clearing should succeed");
-        assert_eq!(select(&conn, &id).unconfirmed_push, None);
+        let recorded = requests(&conn, &id);
+        let ids: Vec<_> = recorded
+            .iter()
+            .map(|record| record.request.request_id.as_str())
+            .collect();
+        assert_eq!(ids, ["save", "read", "lost"]);
+        assert!(matches!(
+            &recorded[0].outcome,
+            Some(EditorRequestOutcome::Response { response: stored, .. }) if *stored == response
+        ));
+        assert!(matches!(
+            &recorded[1].outcome,
+            Some(EditorRequestOutcome::Failure { reason, .. }) if reason == "The device is offline"
+        ));
+        assert_eq!(recorded[2].outcome, None);
+        assert_eq!(recorded[2].request.body, request("lost", &[]).body);
     }
 
     #[test]
-    fn test_base_mismatch_is_replaced_by_the_latest() {
+    fn test_credential_headers_are_never_stored() {
         let (conn, working_copy_id) = connection_with_working_copy();
-        let id = EditorSessionRepository
-            .insert(&conn, &working_copy_id)
-            .expect("Insert should succeed");
-        assert_eq!(select(&conn, &id).base_mismatch, None);
+        let id = insert_session(&conn, &working_copy_id);
 
         EditorSessionRepository
-            .record_base_mismatch(&conn, &id, &["title".to_string()])
+            .record_request_sent(
+                &conn,
+                &id,
+                &request(
+                    "save",
+                    &[
+                        ("Authorization", "Bearer secret"),
+                        ("Cookie", "wordpress_logged_in=secret"),
+                        ("X-WP-Nonce", "secret"),
+                        ("Content-Type", "application/json"),
+                    ],
+                ),
+            )
             .expect("Recording should succeed");
         EditorSessionRepository
-            .record_base_mismatch(&conn, &id, &["excerpt".to_string(), "meta".to_string()])
+            .record_request_response(
+                &conn,
+                &id,
+                "save",
+                &EditorResponse {
+                    status_code: 200,
+                    headers: HashMap::from([
+                        ("Set-Cookie".to_string(), "secret".to_string()),
+                        ("X-WP-Total".to_string(), "1".to_string()),
+                    ]),
+                    body: vec![],
+                },
+            )
             .expect("Recording should succeed");
+
+        let stored: String = conn
+            .query_row(
+                &format!("SELECT request_headers || response_headers FROM {REQUESTS}"),
+                [],
+                |row| row.get(0),
+            )
+            .expect("Select should succeed");
+        assert!(!stored.contains("secret"), "Stored headers: {stored}");
+        assert_eq!(
+            requests(&conn, &id)[0].request.headers,
+            HashMap::from([("content-type".to_string(), "application/json".to_string())])
+        );
+    }
+
+    #[test]
+    fn test_request_reports_must_follow_the_request() {
+        let (conn, working_copy_id) = connection_with_working_copy();
+        let id = insert_session(&conn, &working_copy_id);
+        let response = EditorResponse {
+            status_code: 200,
+            headers: HashMap::new(),
+            body: vec![],
+        };
 
         assert_eq!(
-            select(&conn, &id)
-                .base_mismatch
-                .map(|mismatch| mismatch.fields),
-            Some(vec!["excerpt".to_string(), "meta".to_string()])
+            EditorSessionRepository.record_request_response(&conn, &id, "unknown", &response),
+            Err(LocalContentError::EditorRequestNotFound {
+                request_id: "unknown".to_string()
+            })
+        );
+
+        EditorSessionRepository
+            .record_request_sent(&conn, &id, &request("save", &[]))
+            .expect("Recording should succeed");
+        assert_eq!(
+            EditorSessionRepository.record_request_sent(&conn, &id, &request("save", &[])),
+            Err(LocalContentError::EditorRequestAlreadyRecorded {
+                request_id: "save".to_string()
+            })
+        );
+        EditorSessionRepository
+            .record_request_response(&conn, &id, "save", &response)
+            .expect("Recording should succeed");
+        assert_eq!(
+            EditorSessionRepository.record_request_failure(&conn, &id, "save", "Lost"),
+            Err(LocalContentError::EditorRequestAlreadyCompleted {
+                request_id: "save".to_string()
+            })
         );
     }
 
@@ -436,15 +674,13 @@ mod tests {
         let missing = WorkingCopyId("not-a-working-copy".to_string());
 
         assert_eq!(
-            EditorSessionRepository.insert(&conn, &missing),
+            EditorSessionRepository.insert(&conn, &missing, None),
             Err(LocalContentError::WorkingCopyNotFound { id: missing })
         );
 
-        let id = EditorSessionRepository
-            .insert(&conn, &working_copy_id)
-            .expect("Insert should succeed");
+        let id = insert_session(&conn, &working_copy_id);
         EditorSessionRepository
-            .record_unconfirmed_push(&conn, &id, None, "{}")
+            .record_request_sent(&conn, &id, &request("save", &[]))
             .expect("Recording should succeed");
         WorkingCopyRepository
             .delete_post(&conn, &working_copy_id)
@@ -456,5 +692,11 @@ mod tests {
                 .expect("Select should succeed"),
             None
         );
+        let remaining: i64 = conn
+            .query_row(&format!("SELECT COUNT(*) FROM {REQUESTS}"), [], |row| {
+                row.get(0)
+            })
+            .expect("Count should succeed");
+        assert_eq!(remaining, 0);
     }
 }

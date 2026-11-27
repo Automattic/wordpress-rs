@@ -55,7 +55,7 @@ fn test_post_and_page_ids_are_not_interchangeable() {
         .expect("Select should succeed");
     let tx = conn.transaction().expect("Failed to begin transaction");
     let updated_as_post = WorkingCopyRepository
-        .update_post(&tx, &page_id, &simple_post("Not a page"))
+        .update_post(&tx, &page_id, &simple_post("Not a page"), None)
         .expect("Update should succeed");
 
     assert_eq!(as_post, None);
@@ -76,7 +76,7 @@ fn test_update_replaces_fields_and_keeps_the_target() {
     let edited = simple_post("Edited");
     let tx = conn.transaction().expect("Failed to begin transaction");
     let updated = WorkingCopyRepository
-        .update_post(&tx, &id, &edited)
+        .update_post(&tx, &id, &edited, None)
         .expect("Update should succeed");
     tx.commit().expect("Commit should succeed");
     let after = WorkingCopyRepository
@@ -85,8 +85,12 @@ fn test_update_replaces_fields_and_keeps_the_target() {
         .expect("Updated post should exist");
     let stored_password: Option<String> = conn
         .query_row(
-            &format!("SELECT password FROM {WORKING_COPIES} WHERE uuid = ?"),
-            [&id],
+            &format!(
+                "SELECT f.password FROM {FIELD_SETS} f
+                 JOIN {VERSIONS} v ON v.field_set_rowid = f.rowid
+                 ORDER BY v.rowid DESC LIMIT 1"
+            ),
+            [],
             |row| row.get(0),
         )
         .expect("Query should succeed");
@@ -107,6 +111,7 @@ fn test_update_returns_false_for_unknown_id() {
             &tx,
             &WorkingCopyId("00000000-0000-4000-8000-000000000000".to_string()),
             &simple_post("Title"),
+            None,
         )
         .expect("Update should succeed");
     assert!(!updated);
@@ -155,7 +160,7 @@ fn test_custom_status_another_variant_covers_is_saved_as_that_variant() {
         let inserted = insert_post(&mut conn, &post, &remote_target);
         let tx = conn.transaction().expect("Failed to begin transaction");
         WorkingCopyRepository
-            .update_post(&tx, &saved, &post)
+            .update_post(&tx, &saved, &post, None)
             .expect("Update should succeed");
         tx.commit().expect("Commit should succeed");
         let status_of = |id: &WorkingCopyId| {
@@ -194,17 +199,12 @@ fn test_working_copies_are_listed_most_recently_updated_first() {
         },
         &site,
     );
-    for (id, updated_at) in [
-        (&oldest, "2026-01-01T00:00:00.000Z"),
-        (&newer, "2026-02-01T00:00:00.000Z"),
-        (&another_sites, "2026-02-15T00:00:00.000Z"),
-        (&edited_last, "2026-03-01T00:00:00.000Z"),
-    ] {
-        conn.execute(
-            &format!("UPDATE {WORKING_COPIES} SET updated_at = ? WHERE uuid = ?"),
-            rusqlite::params![updated_at, id],
-        )
-        .expect("Update should succeed");
+    for id in [&oldest, &newer, &another_sites, &edited_last] {
+        let tx = conn.transaction().expect("Failed to begin transaction");
+        WorkingCopyRepository
+            .update_post(&tx, id, &simple_post("Saved again"), None)
+            .expect("Update should succeed");
+        tx.commit().expect("Commit should succeed");
     }
 
     let ids = |posts: Vec<PostWorkingCopy>| -> Vec<WorkingCopyId> {
