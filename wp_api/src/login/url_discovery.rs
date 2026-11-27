@@ -1,6 +1,7 @@
 use super::{OAuth2Endpoints, WpApiDetails};
 use crate::{
     api_error::{RequestExecutionError, RequestExecutionErrorReason, WpErrorCode},
+    html_links::{HtmlLinks, resolve_web_address},
     login::KnownAuthenticationBlockingPlugin,
     parsed_url::{ParseUrlError, ParsedUrl},
     request::{ResponseBodyType, WpRedirect},
@@ -14,6 +15,7 @@ use std::{
     num::{NonZero, NonZeroUsize},
     sync::Arc,
 };
+use url::Url;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
@@ -774,26 +776,50 @@ impl XmlrpcDiscoveryError {
     }
 }
 
-pub(crate) fn extract_rsd_url(html: &str) -> Option<String> {
-    let selector =
-        Selector::parse("link[rel='EditURI'][type='application/rsd+xml'][title='RSD']").ok()?;
-    Html::parse_document(html)
-        .select(&selector)
-        .next()?
-        .value()
-        .attr("href")
-        .map(String::from)
+/// The address relative links on a site's homepage resolve against, when the homepage was
+/// requested at `site_url`.
+///
+/// A site address is a directory, so this adds a trailing slash: links on `example.com/blog`
+/// resolve as they would on `example.com/blog/`, where WordPress redirects it. Without the
+/// slash, `wp-json/` would resolve to `example.com/wp-json/`.
+///
+/// The response doesn't say where a redirect ended up, so a homepage that redirects to another
+/// host or path still resolves against `site_url`.
+pub(crate) fn site_directory_url(site_url: &Url) -> Url {
+    let mut directory = site_url.clone();
+    if !directory.cannot_be_a_base() && !directory.path().ends_with('/') {
+        let path = format!("{}/", directory.path());
+        directory.set_path(&path);
+    }
+    directory
 }
 
-pub(crate) fn parse_rsd_for_xmlrpc(rsd_xml: &str) -> Option<ParsedUrl> {
-    // The `rsd_xml` is typically from `<site-url>/xmlrpc.php?rsd`
+/// The address of the RSD document `html` links to, resolved against `page_url` the way a
+/// browser would. The link may be relative, such as `/wp/xmlrpc.php?rsd`.
+///
+/// The first matching `<link>` with a usable `href` wins.
+pub(crate) fn extract_rsd_url(html: &str, page_url: &Url) -> Option<Url> {
+    let selector = Selector::parse("link[rel='EditURI'][type='application/rsd+xml'][title='RSD']")
+        .expect("the RSD link selector is valid");
+    let links = HtmlLinks::parse(html, page_url);
+    links
+        .active_elements(&selector)
+        .find_map(|link| links.resolve(link.value().attr("href")?))
+}
 
-    roxmltree::Document::parse(rsd_xml)
-        .ok()?
+/// The XML-RPC address in an RSD document downloaded from `rsd_url`.
+///
+/// `apiLink` may be relative, such as `/wp/xmlrpc.php`. WordPress builds it the same way as the
+/// homepage's link to the RSD document, so a site that makes one relative makes both relative.
+/// It's resolved against `rsd_url`, keeping only `http` and `https`.
+pub(crate) fn parse_rsd_for_xmlrpc(rsd_xml: &str, rsd_url: &Url) -> Option<ParsedUrl> {
+    // The `rsd_xml` is typically from `<site-url>/xmlrpc.php?rsd`
+    let document = roxmltree::Document::parse(rsd_xml).ok()?;
+    let api_link = document
         .descendants()
         .find(|n| n.has_tag_name("api") && n.attribute("name") == Some("WordPress"))?
-        .attribute("apiLink")
-        .and_then(|s| ParsedUrl::parse(s).ok())
+        .attribute("apiLink")?;
+    resolve_web_address(api_link, rsd_url).map(ParsedUrl::new)
 }
 
 pub(crate) fn is_xmlrpc_response(body: &str) -> bool {
@@ -974,10 +1000,57 @@ mod tests {
             </service>
         </rsd>
         "#.trim();
-        let parsed_url = parse_rsd_for_xmlrpc(content);
+        let parsed_url = parse_rsd_for_xmlrpc(
+            content,
+            &Url::parse("https://example.com/xmlrpc.php?rsd").unwrap(),
+        );
         assert_eq!(
             parsed_url,
             Some(ParsedUrl::parse("https://example.com/xmlrpc.php").unwrap())
+        );
+    }
+
+    #[rstest]
+    #[case::absolute(
+        "https://example.com/wp/xmlrpc.php",
+        Some("https://example.com/wp/xmlrpc.php")
+    )]
+    #[case::root_relative("/wp/xmlrpc.php", Some("https://example.com/wp/xmlrpc.php"))]
+    #[case::path_relative("xmlrpc.php", Some("https://example.com/wp/xmlrpc.php"))]
+    #[case::protocol_relative(
+        "//example.com/wp/xmlrpc.php",
+        Some("https://example.com/wp/xmlrpc.php")
+    )]
+    #[case::empty("", None)]
+    #[case::javascript("javascript:void(0)", None)]
+    #[case::ftp("ftp://example.com/xmlrpc.php", None)]
+    fn test_parse_rsd_resolves_api_link_against_rsd_url(
+        #[case] api_link: &str,
+        #[case] expected: Option<&str>,
+    ) {
+        let content = format!(
+            r#"<?xml version="1.0"?><rsd version="1.0"><service><apis><api name="WordPress" blogID="1" preferred="true" apiLink="{api_link}" /></apis></service></rsd>"#
+        );
+        let rsd_url = Url::parse("https://example.com/wp/xmlrpc.php?rsd").unwrap();
+        assert_eq!(
+            parse_rsd_for_xmlrpc(&content, &rsd_url).map(|url| url.url()),
+            expected.map(String::from)
+        );
+    }
+
+    #[rstest]
+    #[case::no_trailing_slash("https://example.com/blog", "https://example.com/blog/")]
+    #[case::trailing_slash("https://example.com/blog/", "https://example.com/blog/")]
+    #[case::root("https://example.com", "https://example.com/")]
+    #[case::keeps_query(
+        "https://example.com/blog?lang=fr",
+        "https://example.com/blog/?lang=fr"
+    )]
+    #[case::not_a_base("mailto:someone@example.com", "mailto:someone@example.com")]
+    fn test_site_directory_url(#[case] site_url: &str, #[case] expected: &str) {
+        assert_eq!(
+            site_directory_url(&Url::parse(site_url).unwrap()).as_str(),
+            expected
         );
     }
 
