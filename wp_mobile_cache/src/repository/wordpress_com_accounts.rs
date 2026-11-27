@@ -50,12 +50,12 @@ impl WordPressComAccountRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MigrationManager;
+    use crate::{MIGRATIONS, MigrationManager};
     use rusqlite::Connection;
 
     fn conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
-        MigrationManager::new(&conn)
+        MigrationManager::new(&conn, &MIGRATIONS)
             .unwrap()
             .perform_migrations()
             .unwrap();
