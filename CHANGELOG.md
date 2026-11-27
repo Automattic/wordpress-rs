@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OAuth2ConfigurationStore.configuration_for(endpoints)`: like `find_configuration`, but fails with a localized `OAuth2ConfigurationStoreError` when the site's OAuth2 provider isn't registered, so apps can show a message instead of silently doing nothing.
 - **Internal:** `wp_rs_cli wpcom-login` signs in to WordPress.com in a browser with the OAuth2 authorization code flow and saves the account's bearer token to a file only you can read, without printing it. It reads the application's client ID and secret from a JSON file such as `wp_com_test_credentials.json`. It catches the sign-in itself when the application lists `http://localhost:8765/callback` as a redirect URL, and asks for the address the browser was sent to for any other redirect URL.
 
+### Fixed
+
+- Swift: `WpRequestExecutor.cancel(context:)` now cancels every request made for the context, including ones started after the call. Cancelling during a `RetryAfterMiddleware` backoff (or anywhere no request was in flight for a second) previously cancelled nothing, so the retry went out and the call succeeded. Cancellation also now works on Linux, where it was compiled out.
+- Swift: a request started from an already-cancelled `Task` now fails with `CancellationError` instead of running to completion.
+
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
