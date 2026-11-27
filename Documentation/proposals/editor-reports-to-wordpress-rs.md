@@ -13,11 +13,18 @@ Information flows one way, from the editor to wordpress-rs. The one exception is
 
 While the editor is open, only the editor sends the post to the server. Once it closes, only wordpress-rs does. An app that doesn't ask GutenbergKit for reports gets GutenbergKit's built-in behavior, unchanged.
 
-## Why
+## Goals
 
-**GutenbergKit needs the editor to run the save.** Plugins can run code when a post is saved, through hooks on Gutenberg's [`savePost()`](https://github.com/WordPress/gutenberg/blob/%40wordpress/editor%4016.1.0/packages/editor/src/store/actions.js#L243-L476). When the app saves the post itself, `savePost()` never runs, and neither do those hooks ([CMM-2024](https://linear.app/a8c/issue/CMM-2024/videopress-metadata-change-not-persisted) is one resulting bug, in VideoPress). [Editor-driven saving](https://linear.app/a8c/document/editor-driven-saving-design-5520af8f36b9) has the editor save the post to the server while it's open, and the app after it closes. This proposal keeps that split, and adds the reports.
+The primary goal is the [Local Content Principles](https://github.com/Automattic/wordpress-rs/blob/local-content-storage/Documentation/local-content-principles.md), above all that what the user writes on the device is never lost.
 
-**wordpress-rs needs to keep what the user wrote, and what happened to it.** Local content storage ([wordpress-rs#1682](https://github.com/Automattic/wordpress-rs/pull/1682), a draft) keeps the posts the user edits on the device, so they're never lost. With the editor's reports, it also keeps every version the user went through, and every request the editor sent. After a crash, or when the system ends the app, wordpress-rs can tell from its own records what the user wrote, and which requests got an answer.
+Secondary goals:
+
+- **Find any earlier version of a post.** Every change is kept as a version, so the user can go back to one, and edit from it. See "D. Storage".
+- **Know what happened to a session that didn't end.** After a crash, or when the system ends the app, the app can find the sessions that stopped, what they recorded, and which requests never got an answer. See "A session that didn't end normally".
+- **Follow and reproduce what happened.** A session's versions and its request log record it step by step, so a bug can be traced back through them, and the steps can be reproduced. See "D. Storage".
+- **Never make the editor wait.** The editor sends its requests without waiting for wordpress-rs to record them. See "A. The editor protocol".
+- **Keep the two libraries independent.** GutenbergKit and wordpress-rs each define their own protocol, and either can change without the other. See "The layers".
+- **Never store a credential.** Sessions record who made their requests in a form that isn't a credential, and the request log leaves credential headers out. See "D. Storage".
 
 ## Terms
 
@@ -318,7 +325,7 @@ The request log never stores a credential. Headers that carry one, such as `auth
 
 Opening a new post creates its working copy and its editing session straight away. The editor creates the post on the server when it first saves it. The reported create links the working copy to the new post, so from then on the working copy has the post's server ID.
 
-`[not designed]` How the editor moves to the new post's ID. Inside Gutenberg, the post's ID is the key it stores the post under, so it has to move the post to the new key with its unsaved edits. Editor-driven saving plans this as `adoptPost` ([CMM-2564](https://linear.app/a8c/issue/CMM-2564/let-the-host-hand-a-newly-created-post-id-to-the-editor)), which also has to clear the undo history ([CMM-2742](https://linear.app/a8c/issue/CMM-2742/clear-the-undo-history-when-the-editor-adopts-a-new-post-id)).
+`[not designed]` How the editor moves to the new post's ID. Inside Gutenberg, the post's ID is the key it stores the post under, so it has to move the post to the new key with its unsaved edits. GutenbergKit's editor-driven saving work plans this as `adoptPost`, which also has to clear the undo history.
 
 ### A session that didn't end normally
 
