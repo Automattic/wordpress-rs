@@ -1,0 +1,151 @@
+use crate::{
+    comments::CommentId,
+    posts::PostId,
+    request::endpoint::{AsNamespace, DerivedRequest},
+    wp_com::{
+        WpComNamespace, WpComSiteId,
+        reader_likes::{
+            ReaderCommentLikeResponse, ReaderLikesParams, ReaderLikesResponse,
+            ReaderPostLikeResponse,
+        },
+    },
+};
+use wp_derive_request_builder::WpDerivedRequest;
+
+#[derive(WpDerivedRequest)]
+enum ReaderLikesRequest {
+    // The users who liked a post, newest like first, paged by the date of the last like. Answers
+    // signed out for a public site; a private site's is then a 403 `unauthorized`. A post that
+    // doesn't exist is a 404 `unknown_post`.
+    #[get(url = "/sites/<wp_com_site_id>/posts/<post_id>/likes", params = &ReaderLikesParams, output = ReaderLikesResponse)]
+    PostLikes,
+    // The users who liked a comment, with the same parameters and paging as a post's likes.
+    // Answers signed out for a public site. A comment that doesn't exist is a 404
+    // `unknown_comment`.
+    #[get(url = "/sites/<wp_com_site_id>/comments/<comment_id>/likes", params = &ReaderLikesParams, output = ReaderLikesResponse)]
+    CommentLikes,
+    // Likes a post, for the user. It takes no parameters. In trials the API refused every like
+    // with a 400 `like_failed` and an empty message, for a reason that isn't known, so the answer
+    // to a like that works wasn't seen.
+    #[post(url = "/sites/<wp_com_site_id>/posts/<post_id>/likes/new", output = ReaderPostLikeResponse)]
+    LikePost,
+    // Removes the user's like from a post. It takes no parameters. For a post the user doesn't
+    // like it's still a 200, with `success: false`.
+    #[post(url = "/sites/<wp_com_site_id>/posts/<post_id>/likes/mine/delete", output = ReaderPostLikeResponse)]
+    UnlikePost,
+    // Likes a comment, for the user. It takes no parameters. In trials the API refused the like
+    // with a 400 `comment_like_failed` and an empty message, for a reason that isn't known, so
+    // the answer to a like that works wasn't seen.
+    #[post(url = "/sites/<wp_com_site_id>/comments/<comment_id>/likes/new", output = ReaderCommentLikeResponse)]
+    LikeComment,
+    // Removes the user's like from a comment. It takes no parameters. For a comment the user
+    // doesn't like it's still a 200, with `success: false`.
+    #[post(url = "/sites/<wp_com_site_id>/comments/<comment_id>/likes/mine/delete", output = ReaderCommentLikeResponse)]
+    UnlikeComment,
+}
+
+impl DerivedRequest for ReaderLikesRequest {
+    fn namespace(&self) -> impl AsNamespace {
+        match self {
+            // The newest lists of likes, and the ones with each like's date, which paging needs.
+            // `rest/v1.1` returns likes with no dates, and no way past the first 90 of a post's.
+            Self::PostLikes | Self::CommentLikes => WpComNamespace::RestV1_2,
+            // The only version of each: `rest/v1.2` has none of them.
+            Self::LikePost | Self::UnlikePost | Self::LikeComment | Self::UnlikeComment => {
+                WpComNamespace::RestV1_1
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        request::endpoint::ApiUrlResolver,
+        wp_com::{
+            endpoint::tests::{
+                fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
+                validate_wp_com_rest_v1_2_endpoint,
+            },
+            me::WpComUserId,
+        },
+    };
+    use rstest::*;
+    use std::sync::Arc;
+
+    fn all_params() -> ReaderLikesParams {
+        ReaderLikesParams {
+            number: Some(90),
+            before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+            exclude: vec![WpComUserId(11), WpComUserId(22)],
+        }
+    }
+
+    /// Each excluded user is its own `exclude[]`.
+    const ALL_PARAMS_QUERY: &str =
+        "number=90&before=2026-11-01T00%3A00%3A00%2B00%3A00&exclude%5B%5D=11&exclude%5B%5D=22";
+
+    #[rstest]
+    fn post_likes(endpoint: ReaderLikesRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.post_likes(
+                &WpComSiteId(3584907),
+                &PostId(6014),
+                &ReaderLikesParams::default(),
+            ),
+            "/sites/3584907/posts/6014/likes?",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.post_likes(&WpComSiteId(3584907), &PostId(6014), &all_params()),
+            &format!("/sites/3584907/posts/6014/likes?{ALL_PARAMS_QUERY}"),
+        );
+    }
+
+    #[rstest]
+    fn comment_likes(endpoint: ReaderLikesRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.comment_likes(
+                &WpComSiteId(3584907),
+                &CommentId(451572),
+                &ReaderLikesParams::default(),
+            ),
+            "/sites/3584907/comments/451572/likes?",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.comment_likes(&WpComSiteId(3584907), &CommentId(451572), &all_params()),
+            &format!("/sites/3584907/comments/451572/likes?{ALL_PARAMS_QUERY}"),
+        );
+    }
+
+    #[rstest]
+    fn like_and_unlike_post(endpoint: ReaderLikesRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.like_post(&WpComSiteId(3584907), &PostId(6014)),
+            "/sites/3584907/posts/6014/likes/new",
+        );
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.unlike_post(&WpComSiteId(3584907), &PostId(6014)),
+            "/sites/3584907/posts/6014/likes/mine/delete",
+        );
+    }
+
+    #[rstest]
+    fn like_and_unlike_comment(endpoint: ReaderLikesRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.like_comment(&WpComSiteId(3584907), &CommentId(451572)),
+            "/sites/3584907/comments/451572/likes/new",
+        );
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.unlike_comment(&WpComSiteId(3584907), &CommentId(451572)),
+            "/sites/3584907/comments/451572/likes/mine/delete",
+        );
+    }
+
+    #[fixture]
+    fn endpoint(
+        fixture_wp_com_api_url_resolver: Arc<dyn ApiUrlResolver>,
+    ) -> ReaderLikesRequestEndpoint {
+        ReaderLikesRequestEndpoint::new(fixture_wp_com_api_url_resolver)
+    }
+}

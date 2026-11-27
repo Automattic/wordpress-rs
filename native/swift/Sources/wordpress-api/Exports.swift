@@ -306,6 +306,22 @@ public typealias WpComSiteIdentifier = WordPressAPIInternal.WpComSiteIdentifier
 // MARK: Languages
 public typealias WPComLanguage = WordPressAPIInternal.WpComLanguage
 
+// MARK: Reader Likes
+public typealias ReaderCommentLikeResponse = WordPressAPIInternal.ReaderCommentLikeResponse
+public typealias ReaderLike = WordPressAPIInternal.ReaderLike
+public typealias ReaderLikePreferredBlog = WordPressAPIInternal.ReaderLikePreferredBlog
+public typealias ReaderLikesParams = WordPressAPIInternal.ReaderLikesParams
+public typealias ReaderLikesRequestCommentLikesResponse = WordPressAPIInternal.ReaderLikesRequestCommentLikesResponse
+public typealias ReaderLikesRequestExecutor = WordPressAPIInternal.ReaderLikesRequestExecutor
+public typealias ReaderLikesRequestLikeCommentResponse = WordPressAPIInternal.ReaderLikesRequestLikeCommentResponse
+public typealias ReaderLikesRequestLikePostResponse = WordPressAPIInternal.ReaderLikesRequestLikePostResponse
+public typealias ReaderLikesRequestPostLikesResponse = WordPressAPIInternal.ReaderLikesRequestPostLikesResponse
+public typealias ReaderLikesRequestUnlikeCommentResponse = WordPressAPIInternal.ReaderLikesRequestUnlikeCommentResponse
+public typealias ReaderLikesRequestUnlikePostResponse = WordPressAPIInternal.ReaderLikesRequestUnlikePostResponse
+public typealias ReaderLikesResponse = WordPressAPIInternal.ReaderLikesResponse
+public typealias ReaderPostLikeResponse = WordPressAPIInternal.ReaderPostLikeResponse
+public typealias ReaderUnreadableLike = WordPressAPIInternal.ReaderUnreadableLike
+
 // MARK: Reader Saved Posts
 public typealias ReaderFeedId = WordPressAPIInternal.ReaderFeedId
 public typealias ReaderFeedItemId = WordPressAPIInternal.ReaderFeedItemId
