@@ -32,7 +32,7 @@ Secondary goals:
 - **Version**: the working copy's fields at one point in time. Every change adds a version, and the newest one holds the working copy's current fields. The versions together are its **history**.
 - **Parent**: the version a version was made from. Editing from an older version makes a new version whose parent is that older one.
 - **Cache**: wordpress-rs's copy of what it last learned the server has. It's a separate database from the working copies.
-- **Editing session**: one stretch of work on a working copy, recorded by wordpress-rs. A session in an editor runs from opening the editor to closing it. The app's own work, such as one save from a settings screen, is a one-off session that starts and ends with it. Every version belongs to a session.
+- **Editing session**: one stretch of work on a working copy, recorded by wordpress-rs. A session in an editor runs from opening the editor to closing it. The app's own work, such as one save from a settings screen, is a one-off session that starts and ends with it. Each version is saved in exactly one session. A session can save any number of versions, or none, such as one that only reads or pushes.
 - **Request log**: the requests sent during a session, each with who sent it, and the response or failure that came back. It holds the editor's requests and wordpress-rs's own.
 - **Push**: wordpress-rs sending a working copy to the server, in a session of its own. It pushes only after the editor closes. While the editor is open, the editor saves the post itself.
 - **Base version**: the server's `modified_gmt` for the version of the post a working copy's changes start from.
