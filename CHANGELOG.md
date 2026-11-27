@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OAuth2ConfigurationStore.configuration_for(endpoints)`: like `find_configuration`, but fails with a localized `OAuth2ConfigurationStoreError` when the site's OAuth2 provider isn't registered, so apps can show a message instead of silently doing nothing.
 - **Internal:** `wp_rs_cli wpcom-login` signs in to WordPress.com in a browser with the OAuth2 authorization code flow and saves the account's bearer token to a file only you can read, without printing it. It reads the application's client ID and secret from a JSON file such as `wp_com_test_credentials.json`. It catches the sign-in itself when the application lists `http://localhost:8765/callback` as a redirect URL, and asks for the address the browser was sent to for any other redirect URL.
 
+### Fixed
+
+- Swift: a request URL Foundation can't parse (possible with the strict parser on iOS 16 / macOS 13) now fails with `NonExistentSiteError` instead of crashing, and a non-HTTP response fails the request instead of hitting a `preconditionFailure`.
+- Swift: `URLError.unsupportedURL` is now classified as `NonExistentSiteError` (like `.badURL`), `.userAuthenticationRequired` as `HttpAuthenticationRequiredError`, and `.clientCertificateRequired` / `.clientCertificateRejected` as `InvalidSslError(GenericSslError)`. All previously fell through to `GenericError`.
+- Swift: every request failure now carries the redirects recorded for the request. The offline, timeout, cancellation, and generic branches always reported `redirects: nil`.
+
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.

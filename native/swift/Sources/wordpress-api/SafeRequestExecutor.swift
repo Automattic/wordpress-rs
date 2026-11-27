@@ -90,63 +90,97 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 return .failure(error)
             }
 
-            if errorIsHttpsError(error) {
-                return handleHttpsError(error, for: request)
-            }
-
-            if errorIsNonExistentSiteError(error) {
-                return handleNonExistentSiteError(error, for: request)
-            }
-
-            if errorIsConnectionError(error) {
-                return handleConnectionError(error, for: request)
-            }
-
-            if errorIsDeviceIsOffline(error) {
-                return handleDeviceIsOfflineError(error, for: request)
-            }
-
-            if let urlError = error as? URLError, urlError.code == .cancelled {
-                return .failure(
-                    .RequestExecutionFailed(
-                        statusCode: nil,
-                        redirects: nil,
-                        reason: .cancellationError,
-                        requestUrl: request.url(),
-                        requestMethod: request.method()
-                    )
-                )
-            }
-
-            if let urlError = error as? URLError, urlError.code == .timedOut {
-                // `.timedOut` conflates connect- and read-timeouts, matching reqwest's
-                // `is_timeout()` and Kotlin's `SocketTimeoutException`, so classifying it as
-                // `httpTimeoutError` brings Apple platforms to parity with the other executors.
-                // Caveat: with `URLSessionConfiguration.waitsForConnectivity == true` (the default is
-                // `false`), an offline device surfaces here as `.timedOut` rather than
-                // `.notConnectedToInternet`, so it classifies as `httpTimeoutError` rather than
-                // `deviceIsOfflineError`.
-                return .failure(
-                    .RequestExecutionFailed(
-                        statusCode: nil,
-                        redirects: nil,
-                        reason: .httpTimeoutError,
-                        requestUrl: request.url(),
-                        requestMethod: request.method()
-                    )
-                )
-            }
-
-            return .failure(
-                .RequestExecutionFailed(
-                    statusCode: nil,
-                    redirects: nil,
-                    reason: .genericError(errorMessage: error.localizedDescription),
-                    requestUrl: request.url(),
-                    requestMethod: request.method()
-                )
-            )
+            return classify(error, for: request)
         }
+    }
+
+    private func classify(
+        _ error: Error,
+        for request: NetworkRequestContent
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        if errorIsHttpsError(error) {
+            return handleHttpsError(error, for: request)
+        }
+
+        if errorIsNonExistentSiteError(error) {
+            return handleNonExistentSiteError(error, for: request)
+        }
+
+        if errorIsConnectionError(error) {
+            return handleConnectionError(error, for: request)
+        }
+
+        if errorIsDeviceIsOffline(error) {
+            return handleDeviceIsOfflineError(error, for: request)
+        }
+
+        guard let urlError = error as? URLError else {
+            return failure(.genericError(errorMessage: error.localizedDescription), for: request)
+        }
+
+        return failure(reason(for: urlError, request: request), for: request)
+    }
+
+    /// The reason for a `URLError` none of the grouped predicates above claimed.
+    private func reason(
+        for urlError: URLError,
+        request: NetworkRequestContent
+    ) -> RequestExecutionErrorReason {
+        switch urlError.code {
+        case .cancelled:
+            return .cancellationError
+        case .timedOut:
+            // `.timedOut` conflates connect- and read-timeouts, matching reqwest's
+            // `is_timeout()` and Kotlin's `SocketTimeoutException`, so classifying it as
+            // `httpTimeoutError` brings Apple platforms to parity with the other executors.
+            // Caveat: with `URLSessionConfiguration.waitsForConnectivity == true` (the default is
+            // `false`), an offline device surfaces here as `.timedOut` rather than
+            // `.notConnectedToInternet`, so it classifies as `httpTimeoutError` rather than
+            // `deviceIsOfflineError`.
+            return .httpTimeoutError
+        case .userAuthenticationRequired:
+            // URLSession raises this when an authentication challenge (typically from an
+            // authenticating proxy) can't be answered. The request never got a response to read an
+            // auth scheme from, so the method is unknown. See #1505.
+            return .httpAuthenticationRequiredError(hostname: hostname(of: request), method: nil)
+        case .clientCertificateRequired, .clientCertificateRejected:
+            // The server demanded (or refused) a client certificate during the TLS handshake — a
+            // mutual-TLS deployment. It's a TLS failure, but not one about the server's certificate,
+            // so it gets the generic SSL reason. See #1505.
+            return .invalidSslError(reason: .genericSslError)
+        default:
+            return .genericError(errorMessage: urlError.localizedDescription)
+        }
+    }
+
+    /// A `RequestExecutionFailed` failure for `request`, carrying any redirects recorded for it.
+    ///
+    /// Every failure branch goes through here so the redirect trail is never dropped: a request that
+    /// redirected and then timed out, went offline, was cancelled, or failed unclassified still
+    /// reports where it went. `redirects(for:)` is `nil` when there were none. See #1520.
+    private func failure(
+        _ reason: RequestExecutionErrorReason,
+        for request: NetworkRequestContent
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        .failure(
+            .RequestExecutionFailed(
+                statusCode: nil,
+                redirects: executorDelegate.redirects(for: request.requestId()),
+                reason: reason,
+                requestUrl: request.url(),
+                requestMethod: request.method()
+            )
+        )
+    }
+
+    /// The request's host, with its port when the URL names one — the same shape as the Rust
+    /// `RequestExecutionErrorReason::hostname_of`, so the `hostname` a reason carries doesn't depend
+    /// on which layer built it.
+    private func hostname(of request: NetworkRequestContent) -> String {
+        guard let components = URLComponents(string: request.url()), let host = components.host else {
+            return ""
+        }
+        return components.port.map { "\(host):\($0)" } ?? host
     }
 
     private func fetch(request: URLRequest) async throws -> (Data, URLResponse) {
@@ -198,30 +232,17 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
 
         guard let siteCertificate = leafCertificate(from: error) else {
-            return .failure(
-                .RequestExecutionFailed(
-                    statusCode: nil,
-                    redirects: executorDelegate.redirects(for: request.requestId()),
-                    reason: .invalidSslError(reason: InvalidSslErrorReason.genericSslError),
-                    requestUrl: request.url(),
-                    requestMethod: request.method()
-                )
-            )
+            return failure(.invalidSslError(reason: .genericSslError), for: request)
         }
 
-        return .failure(
-            .RequestExecutionFailed(
-                statusCode: nil,
-                redirects: executorDelegate.redirects(for: request.requestId()),
-                reason: RequestExecutionErrorReason.invalidSslError(
-                    reason: .certificateNotValidForName(
-                        hostname: URL(string: request.url())?.host ?? "unknown host",
-                        presentedHostnames: siteCertificate.presentedHostnames()
-                    )
-                ),
-                requestUrl: request.url(),
-                requestMethod: request.method()
-            )
+        return failure(
+            .invalidSslError(
+                reason: .certificateNotValidForName(
+                    hostname: URL(string: request.url())?.host ?? "unknown host",
+                    presentedHostnames: siteCertificate.presentedHostnames()
+                )
+            ),
+            for: request
         )
     }
 
@@ -229,17 +250,12 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         _ error: Error,
         for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        .failure(
-            .RequestExecutionFailed(
-                statusCode: nil,
-                redirects: executorDelegate.redirects(for: request.requestId()),
-                reason: .nonExistentSiteError(
-                    errorMessage: error.localizedDescription,
-                    suggestedAction: (error as NSError).localizedRecoverySuggestion
-                ),
-                requestUrl: request.url(),
-                requestMethod: request.method()
-            )
+        failure(
+            .nonExistentSiteError(
+                errorMessage: error.localizedDescription,
+                suggestedAction: (error as NSError).localizedRecoverySuggestion
+            ),
+            for: request
         )
     }
 
@@ -247,15 +263,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         _ error: Error,
         for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        .failure(
-            .RequestExecutionFailed(
-                statusCode: nil,
-                redirects: executorDelegate.redirects(for: request.requestId()),
-                reason: .connectionError(reason: error.localizedDescription),
-                requestUrl: request.url(),
-                requestMethod: request.method()
-            )
-        )
+        failure(.connectionError(reason: error.localizedDescription), for: request)
     }
 
     public func sleep(millis: UInt64) async {
@@ -287,17 +295,22 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         // `isSiteUnreachable` predicate built on it — a portable "the host does
         // not resolve" signal across platforms. See #1495.
         //
-        // `.badURL` is grouped here deliberately. A malformed URL has no dedicated
+        // `.badURL` and `.unsupportedURL` are grouped here deliberately: both mean
+        // the site URL can't be requested at all. A malformed URL has no dedicated
         // classification at the executor layer: `RequestExecutionError` can't
         // produce `WpApiError.SiteUrlParsingError` (that's a parse-time error, one
         // layer up) and `RequestExecutionErrorReason` has no invalid-URL case, so
-        // `NonExistentSiteError` is the nearest fit. In practice we could not
-        // construct a URL that reaches this branch: request URLs are normalized by
-        // the Rust `url` crate before they arrive, and modern Foundation repairs
-        // the leftovers (e.g. an invalid `%zz` becomes `%25zz`) rather than raising
-        // `.badURL`. It's kept for completeness.
+        // `NonExistentSiteError` is the nearest fit.
+        //
+        // Request URLs are normalized by the Rust `url` crate before they arrive,
+        // and Foundation on iOS 17 / macOS 14 and later repairs the leftovers (an
+        // invalid `%zz` becomes `%25zz`). The older, strict parser on the package's
+        // iOS 16 / macOS 13 minimums does not: it rejects characters the `url` crate
+        // legally leaves unencoded (`|`, `^`, `[`, `]`), and `buildURLRequest` throws
+        // `.badURL` for those rather than crashing. See #1511.
         [
             .badURL,
+            .unsupportedURL,
             .cannotFindHost,
             .dnsLookupFailed
         ]
@@ -341,17 +354,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         _ error: Error,
         for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        .failure(
-            .RequestExecutionFailed(
-                statusCode: nil,
-                redirects: nil,
-                reason: .deviceIsOfflineError(
-                    errorMessage: error.localizedDescription
-                ),
-                requestUrl: request.url(),
-                requestMethod: request.method()
-            )
-        )
+        failure(.deviceIsOfflineError(errorMessage: error.localizedDescription), for: request)
     }
 
     /// Parse the site (leaf) certificate out of a failed TLS handshake.
@@ -606,7 +609,11 @@ protocol NetworkRequestContent {
 
 extension NetworkRequestContent {
     func buildURLRequest(additionalHeaders: [String: String]) throws -> URLRequest {
-        let url = URL(string: self.url())!
+        // Foundation's strict parser on iOS 16 / macOS 13 can reject a URL the Rust `url` crate
+        // accepted. Throw `.badURL` so it classifies as `NonExistentSiteError` instead of crashing.
+        guard let url = URL(string: self.url()) else {
+            throw URLError(.badURL)
+        }
         var request = URLRequest(url: url)
         request.httpMethod = self.method().rawValue
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
