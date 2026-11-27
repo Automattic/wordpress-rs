@@ -40,13 +40,13 @@ pub enum LocalContentError {
     },
     #[error("A working copy's {field} must be a JSON object")]
     NotAJsonObject { field: String },
-    #[error("No editor session with id {}", id.0)]
+    #[error("No editing session with id {}", id.0)]
     EditingSessionNotFound { id: EditingSessionId },
-    #[error("The editor session already has a request with id {request_id}")]
+    #[error("The editing session already has a request with id {request_id}")]
     SessionRequestAlreadyRecorded { request_id: String },
-    #[error("The editor session has no request with id {request_id}")]
+    #[error("The editing session has no request with id {request_id}")]
     SessionRequestNotFound { request_id: String },
-    #[error("The editor session's request {request_id} already has a response or a failure")]
+    #[error("The editing session's request {request_id} already has a response or a failure")]
     SessionRequestAlreadyCompleted { request_id: String },
 }
 

@@ -11,7 +11,7 @@ use crate::db_types::working_copy::WorkingCopyId;
 
 uniffi::custom_newtype!(EditingSessionId, String);
 
-/// The ID of an editor session, assigned when it's created: a lowercase,
+/// The ID of an editing session, assigned when it's created: a lowercase,
 /// hyphenated v4 UUID.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EditingSessionId(pub String);
