@@ -22,6 +22,11 @@ const WORKING_COPIES: &str = "working_copies";
 /// The current time as a Unix timestamp in seconds, in SQL.
 const NOW: &str = "CAST(strftime('%s', 'now') AS INTEGER)";
 
+/// The `uuid` of the newest version of the working copy `w`, in SQL, or NULL
+/// if it has none yet.
+const NEWEST_VERSION: &str = "(SELECT v.uuid FROM working_copy_versions v
+      WHERE v.working_copy_rowid = w.rowid ORDER BY v.rowid DESC LIMIT 1)";
+
 /// Headers that carry credentials. They're left out of every stored request
 /// and response, so the database never holds a credential.
 const CREDENTIAL_HEADERS: [&str; 5] = [
@@ -58,8 +63,10 @@ impl EditingSessionRepository {
         let inserted = executor.execute(
             &format!(
                 "INSERT INTO {EDITING_SESSIONS}
-                     (uuid, working_copy_rowid, source, source_name, client, run, identity, started_at)
-                 SELECT ?, rowid, ?, ?, ?, ?, ?, {NOW} FROM {WORKING_COPIES} WHERE uuid = ?"
+                     (uuid, working_copy_rowid, source, source_name, client, run,
+                      started_from_version, identity, started_at)
+                 SELECT ?, w.rowid, ?, ?, ?, ?, {NEWEST_VERSION}, ?, {NOW}
+                 FROM {WORKING_COPIES} w WHERE w.uuid = ?"
             ),
             rusqlite::params![
                 id,
@@ -298,13 +305,14 @@ pub(crate) fn insert_one_off(
     let id = EditingSessionId::generate();
     let mut stmt = executor.prepare(&format!(
         "INSERT INTO {EDITING_SESSIONS}
-             (uuid, working_copy_rowid, source, client, run, started_at, last_recorded_at,
-              ended_at, ending)
-         VALUES (?, ?, 'app', ?, ?, {NOW}, {NOW}, {NOW}, 'normal')
+             (uuid, working_copy_rowid, source, client, run, started_from_version, started_at,
+              last_recorded_at, ended_at, ending)
+         SELECT ?, w.rowid, 'app', ?, ?, {NEWEST_VERSION}, {NOW}, {NOW}, {NOW}, 'normal'
+         FROM {WORKING_COPIES} w WHERE w.rowid = ?
          RETURNING rowid"
     ))?;
     Ok(stmt.query_row(
-        rusqlite::params![id, working_copy_rowid, client, current_run()],
+        rusqlite::params![id, client, current_run(), working_copy_rowid],
         |row| row.get(0),
     )?)
 }
@@ -322,7 +330,7 @@ pub(crate) fn select_rowid(
 /// The columns `session_from_row` reads, in its order.
 const SELECT_SESSIONS: &str = "
     SELECT s.uuid, w.uuid, s.source, s.source_name, s.client, s.identity, s.started_at,
-           s.last_recorded_at, s.ended_at, s.ending
+           s.last_recorded_at, s.ended_at, s.ending, s.started_from_version
     FROM editing_sessions s
     JOIN working_copies w ON w.rowid = s.working_copy_rowid";
 
@@ -378,6 +386,7 @@ fn session_from_row(row: &Row) -> rusqlite::Result<EditingSession> {
         source: source_at(row, 2)?,
         client: row.get(4)?,
         identity: row.get(5)?,
+        started_from: row.get(10)?,
         started_at: required_date_at(row, 6, "started_at")?,
         last_recorded_at: date_at(row, 7)?,
         end,
@@ -607,6 +616,21 @@ mod tests {
         assert_eq!(started.source, editor());
         assert_eq!(started.client, CLIENT);
         assert_eq!(started.identity.as_deref(), Some("identity-hash"));
+        let newest = WorkingCopyRepository
+            .select_versions(&conn, &working_copy_id)
+            .expect("Select should succeed")
+            .expect("The working copy should exist")
+            .pop()
+            .expect("The working copy has a version");
+        assert_eq!(started.started_from, Some(newest.id.clone()));
+        let creating = EditingSessionRepository
+            .select(&conn, &newest.session_id)
+            .expect("Select should succeed")
+            .expect("The creating session should exist");
+        assert_eq!(
+            creating.started_from, None,
+            "The session that created the working copy started from nothing"
+        );
         assert_eq!((started.last_recorded_at, started.end), (None, None));
 
         assert!(

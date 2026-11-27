@@ -190,6 +190,11 @@ CREATE TABLE `editing_sessions` (
   -- The run of the process that opened the session, a v4 UUID per process
   `run` TEXT NOT NULL,
 
+  -- The `uuid` of the working copy's newest version when the session opened.
+  -- Not a reference, so it stays when that version is removed from the
+  -- history. NULL: the session created the working copy
+  `started_from_version` TEXT,
+
   -- Who the session makes its requests as, in a form that isn't a credential.
   -- Recorded as given. NULL: not given
   `identity` TEXT,

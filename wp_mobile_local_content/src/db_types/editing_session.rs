@@ -7,7 +7,7 @@ use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use uuid::Uuid;
 use wp_api::date::WpGmtDateTime;
 
-use crate::db_types::working_copy::WorkingCopyId;
+use crate::db_types::{working_copy::WorkingCopyId, working_copy_version::WorkingCopyVersionId};
 
 uniffi::custom_newtype!(EditingSessionId, String);
 
@@ -73,6 +73,10 @@ pub struct EditingSession {
     /// Who the session makes its requests as, recorded as given, or `None` if
     /// it wasn't given.
     pub identity: Option<String>,
+    /// The working copy's newest version when the session opened, or `None`
+    /// for the session that created the working copy. The version may have
+    /// been removed from the history since.
+    pub started_from: Option<WorkingCopyVersionId>,
     pub started_at: WpGmtDateTime,
     /// When a change was last recorded in the working copy, or `None` if none
     /// was.

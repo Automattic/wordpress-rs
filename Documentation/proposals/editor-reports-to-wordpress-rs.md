@@ -284,6 +284,9 @@ pub struct EditingSession {
     /// Who the session makes its requests as, recorded as given. Nothing uses
     /// it yet.
     pub identity: Option<String>,
+    /// The working copy's newest version when the session opened. `None` for
+    /// the session that created the working copy.
+    pub started_from: Option<WorkingCopyVersionId>,
     pub started_at: WpGmtDateTime,
     /// When a change was last recorded.
     pub last_recorded_at: Option<WpGmtDateTime>,
@@ -315,7 +318,7 @@ pub struct SessionRequestRecord {
 }
 ```
 
-Each session also records the run of the process that opened it, so wordpress-rs can tell a session left open by an earlier run from one open now.
+Each session also records the run of the process that opened it, so wordpress-rs can tell a session left open by an earlier run from one open now. `started_from` is the version's ID, not a link to it, so it stays true after thinning removes that version.
 
 The request log never stores a credential. Headers that carry one, such as `authorization` and `cookie`, are left out of every stored request and response.
 
