@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The Kotlin `WpRequestExecutor` no longer makes `WpApiClient.request` throw an `InternalException` when it's asked to request an address that isn't `http` or `https`, such as a `file:` API root. OkHttp refuses those addresses, and its `IllegalArgumentException` escaped the executor. The request now fails with `GenericError`, as it does with reqwest.
 
+### Fixed
+
+- A request whose token or nonce has a character a header can't carry, such as a line break, now fails with `GenericError` instead of panicking. The nonce a site returns for cookie sign-in is trimmed of whitespace and byte-order marks first.
+
 ## [0.11.1] - 2026-11-18
 
 ### Fixed

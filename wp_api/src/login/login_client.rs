@@ -450,7 +450,8 @@ impl WpLoginClient {
             )),
             None,
         )
-        .retrieve_current_with_edit_context();
+        .retrieve_current_with_edit_context()
+        .map_err(WpApiError::from)?;
         let response = self
             .perform(request.into(), context)
             .await

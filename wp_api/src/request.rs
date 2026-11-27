@@ -1,6 +1,9 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
-    api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpErrorCode},
+    api_error::{
+        ParsedRequestError, RequestExecutionError, RequestExecutionErrorReason, WpApiError,
+        WpErrorCode,
+    },
     auth::{WpAuthentication, WpAuthenticationProvider},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
@@ -71,47 +74,58 @@ impl InnerRequestBuilder {
         Self { auth_provider }
     }
 
-    pub fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
-        WpNetworkRequest {
+    pub fn get(&self, url: ApiEndpointUrl) -> Result<WpNetworkRequest, RequestExecutionError> {
+        let header_map = self.header_map(&url, RequestMethod::GET)?;
+        Ok(WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
             retry_count: 0,
             method: RequestMethod::GET,
             url: url.into(),
-            header_map: self.header_map().into(),
+            header_map: header_map.into(),
             body: None,
-        }
+        })
     }
 
-    pub fn post<T>(&self, url: ApiEndpointUrl, json_body: Option<&T>) -> WpNetworkRequest
+    pub fn post<T>(
+        &self,
+        url: ApiEndpointUrl,
+        json_body: Option<&T>,
+    ) -> Result<WpNetworkRequest, RequestExecutionError>
     where
         T: ?Sized + Serialize,
     {
-        WpNetworkRequest {
+        let header_map = self.header_map_for_post_request(&url)?;
+        Ok(WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
             retry_count: 0,
             method: RequestMethod::POST,
             url: url.into(),
-            header_map: self.header_map_for_post_request().into(),
+            header_map: header_map.into(),
             body: json_body.and_then(|j| {
                 serde_json::to_vec(j)
                     .ok()
                     .map(|b| Arc::new(WpNetworkRequestBody::new(b)))
             }),
-        }
+        })
     }
 
-    pub fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
-        WpNetworkRequest {
+    pub fn delete(&self, url: ApiEndpointUrl) -> Result<WpNetworkRequest, RequestExecutionError> {
+        let header_map = self.header_map(&url, RequestMethod::DELETE)?;
+        Ok(WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
             retry_count: 0,
             method: RequestMethod::DELETE,
             url: url.into(),
-            header_map: self.header_map().into(),
+            header_map: header_map.into(),
             body: None,
-        }
+        })
     }
 
-    pub fn post_multipart<T>(&self, url: ApiEndpointUrl, params: &T) -> WpMultipartFormRequest
+    pub fn post_multipart<T>(
+        &self,
+        url: ApiEndpointUrl,
+        params: &T,
+    ) -> Result<WpMultipartFormRequest, RequestExecutionError>
     where
         T: ?Sized + Serialize + RequiresMultipartForm,
     {
@@ -127,32 +141,36 @@ impl InnerRequestBuilder {
             form.push(WpMultipartFormField::File { name, file });
         }
 
-        let mut header_map = self.header_map_for_post_request();
+        let mut header_map = self.header_map_for_post_request(&url)?;
         header_map.inner.insert(
             http::header::CONTENT_TYPE,
             HeaderValue::from_static(CONTENT_TYPE_MULTIPART),
         );
 
-        WpMultipartFormRequest {
+        Ok(WpMultipartFormRequest {
             uuid: Uuid::new_v4().into(),
             method: RequestMethod::POST,
             url: url.into(),
             header_map: header_map.into(),
             form,
-        }
+        })
     }
 
-    pub fn post_form_urlencoded<T>(&self, url: ApiEndpointUrl, params: &T) -> WpNetworkRequest
+    pub fn post_form_urlencoded<T>(
+        &self,
+        url: ApiEndpointUrl,
+        params: &T,
+    ) -> Result<WpNetworkRequest, RequestExecutionError>
     where
         T: ?Sized + Serialize,
     {
-        let mut header_map = self.header_map_for_post_request();
+        let mut header_map = self.header_map_for_post_request(&url)?;
         header_map.inner.insert(
             http::header::CONTENT_TYPE,
             HeaderValue::from_static("application/x-www-form-urlencoded"),
         );
 
-        WpNetworkRequest {
+        Ok(WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
             retry_count: 0,
             method: RequestMethod::POST,
@@ -161,26 +179,45 @@ impl InnerRequestBuilder {
             body: serde_urlencoded::to_string(params)
                 .ok()
                 .map(|s| Arc::new(WpNetworkRequestBody::new(s.into_bytes()))),
-        }
+        })
     }
 
-    fn header_map(&self) -> WpNetworkHeaderMap {
+    fn header_map(
+        &self,
+        url: &ApiEndpointUrl,
+        method: RequestMethod,
+    ) -> Result<WpNetworkHeaderMap, RequestExecutionError> {
         let mut header_map = HeaderMap::new();
         header_map.insert(
             http::header::ACCEPT,
             HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
-        self.auth_provider.insert_header(&mut header_map);
-        header_map.into()
+        self.auth_provider
+            .insert_header(&mut header_map)
+            .map_err(|_| RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                // Leaves out the value: it's a credential.
+                reason: RequestExecutionErrorReason::GenericError {
+                    error_message: "The sign-in details contain a character that can't be sent."
+                        .to_string(),
+                },
+                request_url: url.as_str().to_string(),
+                request_method: method,
+            })?;
+        Ok(header_map.into())
     }
 
-    fn header_map_for_post_request(&self) -> WpNetworkHeaderMap {
-        let mut header_map = self.header_map();
+    fn header_map_for_post_request(
+        &self,
+        url: &ApiEndpointUrl,
+    ) -> Result<WpNetworkHeaderMap, RequestExecutionError> {
+        let mut header_map = self.header_map(url, RequestMethod::POST)?;
         header_map.inner.insert(
             http::header::CONTENT_TYPE,
             HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
-        header_map
+        Ok(header_map)
     }
 }
 
@@ -1009,7 +1046,7 @@ pub async fn fetch_authentication_state(
 
     let request =
         ApplicationPasswordsRequestBuilder::new(api_url_resolver, authentication_provider, None)
-            .retrieve_current_with_edit_context()
+            .retrieve_current_with_edit_context()?
             .into();
     let response = request_executor.execute(request).await?;
     let parsed_res: Result<
@@ -1535,6 +1572,102 @@ mod tests {
         ApiEndpointUrl::new(Url::parse("https://example.com/api/endpoint").unwrap())
     }
 
+    /// The credentials an app could pass that no header can carry.
+    fn credentials_that_cannot_be_sent() -> Vec<WpAuthentication> {
+        vec![
+            WpAuthentication::Bearer {
+                token: "secret\ntoken".to_string(),
+            },
+            WpAuthentication::AuthorizationHeader {
+                token: "secret\r\ntoken".to_string(),
+            },
+            WpAuthentication::Nonce {
+                nonce: "secret0000\n".to_string(),
+            },
+        ]
+    }
+
+    #[test]
+    fn a_credential_that_cannot_be_sent_fails_building_the_request() {
+        for auth in credentials_that_cannot_be_sent() {
+            let builder =
+                InnerRequestBuilder::new(WpAuthenticationProvider::static_with_auth(auth).into());
+
+            let error = builder.get(test_url()).unwrap_err();
+
+            let RequestExecutionError::RequestExecutionFailed {
+                reason: RequestExecutionErrorReason::GenericError { error_message },
+                request_url,
+                request_method,
+                ..
+            } = &error
+            else {
+                panic!("Unexpected error: {error:?}");
+            };
+            assert_eq!(request_url, test_url().as_str());
+            assert_eq!(request_method, &RequestMethod::GET);
+            assert!(!error_message.contains("secret"), "{error_message}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_credential_that_cannot_be_sent_fails_the_request_without_sending_it() {
+        struct UnreachableExecutor;
+
+        #[async_trait::async_trait]
+        impl RequestExecutor for UnreachableExecutor {
+            async fn execute(
+                &self,
+                _: Arc<WpNetworkRequest>,
+            ) -> Result<WpNetworkResponse, RequestExecutionError> {
+                unreachable!("The request must not be sent")
+            }
+
+            async fn upload(
+                &self,
+                _: Arc<WpMultipartFormRequest>,
+            ) -> Result<WpNetworkResponse, RequestExecutionError> {
+                unreachable!("The request must not be sent")
+            }
+
+            async fn sleep(&self, _: u64) {}
+
+            fn cancel(&self, _: Arc<RequestContext>) {}
+        }
+
+        for auth in credentials_that_cannot_be_sent() {
+            let users = crate::request::endpoint::users_endpoint::UsersRequestExecutor::new(
+                Arc::new(crate::request::endpoint::WpOrgSiteApiUrlResolver::new(
+                    Arc::new(
+                        crate::parsed_url::ParsedUrl::parse("https://example.com/wp-json/")
+                            .unwrap(),
+                    ),
+                )),
+                crate::api_client::WpApiClientDelegate {
+                    auth_provider: WpAuthenticationProvider::static_with_auth(auth).into(),
+                    request_executor: Arc::new(UnreachableExecutor),
+                    middleware_pipeline: crate::middleware::WpApiMiddlewarePipeline::default()
+                        .into(),
+                    app_notifier: Arc::new(crate::EmptyAppNotifier),
+                    language_provider: None,
+                },
+            );
+
+            let error = users.retrieve_me_with_edit_context().await.unwrap_err();
+
+            assert!(
+                matches!(
+                    error,
+                    WpApiError::RequestExecutionFailed {
+                        reason: RequestExecutionErrorReason::GenericError { .. },
+                        ..
+                    }
+                ),
+                "{error:?}"
+            );
+        }
+    }
+
     #[test]
     fn test_post_form_urlencoded_content_type() {
         let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
@@ -1548,7 +1681,7 @@ mod tests {
             key: "value".to_string(),
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let content_type = request
             .header_map
@@ -1576,7 +1709,7 @@ mod tests {
             bar: "world".to_string(),
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
@@ -1598,7 +1731,7 @@ mod tests {
             data: "a&b=c".to_string(),
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
@@ -1621,7 +1754,7 @@ mod tests {
             key: "value".to_string(),
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         assert_eq!(request.method, RequestMethod::POST);
     }
@@ -1641,7 +1774,7 @@ mod tests {
             negative: -42,
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
@@ -1661,7 +1794,7 @@ mod tests {
             message: "hello world".to_string(),
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
@@ -1682,7 +1815,7 @@ mod tests {
             text: "日本語".to_string(),
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
@@ -1704,7 +1837,7 @@ mod tests {
             filled: "value".to_string(),
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
@@ -1727,7 +1860,7 @@ mod tests {
             optional: None,
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
@@ -1750,7 +1883,7 @@ mod tests {
             optional: Some("present".to_string()),
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
@@ -1772,7 +1905,7 @@ mod tests {
             disabled: false,
         };
 
-        let request = builder.post_form_urlencoded(test_url(), &params);
+        let request = builder.post_form_urlencoded(test_url(), &params).unwrap();
 
         let body = request.body.expect("Body should be set");
         let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
