@@ -7,6 +7,7 @@ use rusqlite::Connection;
 use serde_json::json;
 use std::collections::VecDeque;
 use tempfile::TempDir;
+use wp_api::date::WpGmtDateTime;
 use wp_api::{
     api_client::WpApiClientDelegate,
     auth::WpAuthenticationProvider,
@@ -22,7 +23,9 @@ use wp_mobile_cache::{
     MIGRATIONS, WpApiCache, db_types::self_hosted_site::SelfHostedSite,
     repository::sites::SiteRepository,
 };
-use wp_mobile_local_content::WpLocalContentStore;
+use wp_mobile_local_content::{
+    WpLocalContentStore, db_types::editor_session::EditorRequestOutcome,
+};
 use wp_mobile_sqlite::MigrationManager;
 
 const SITE_URL: &str = "https://test.local";
@@ -225,12 +228,31 @@ fn context() -> Context {
     }
 }
 
-fn editor_request(method: &str, path: &str, body: Option<Value>) -> EditorRequest {
+fn editor_request(
+    request_id: &str,
+    method: &str,
+    path: &str,
+    body: Option<Value>,
+) -> EditorRequest {
     EditorRequest {
+        request_id: request_id.to_string(),
         method: method.to_string(),
         path: path.to_string(),
+        headers: HashMap::from([("Authorization".to_string(), "Bearer secret".to_string())]),
         body: body.map(|body| serde_json::to_vec(&body).expect("JSON serializes")),
     }
+}
+
+fn editor_response(status_code: u32, body: &Value) -> EditorResponse {
+    EditorResponse {
+        status_code,
+        headers: HashMap::new(),
+        body: serde_json::to_vec(body).expect("JSON serializes"),
+    }
+}
+
+fn date(value: &str) -> WpGmtDateTime {
+    value.parse().expect("Date parses")
 }
 
 fn base_version(ctx: &Context, session: &PostEditorSession) -> Option<RemotePostReference> {
@@ -240,6 +262,23 @@ fn base_version(ctx: &Context, session: &PostEditorSession) -> Option<RemotePost
         .expect("The working copy exists")
         .remote_target
         .remote_post
+}
+
+fn working_copy_title(ctx: &Context, session: &PostEditorSession) -> String {
+    ctx.local_content
+        .read_post_working_copy(session.working_copy_id())
+        .expect("Read should succeed")
+        .expect("The working copy exists")
+        .fields
+        .common
+        .title
+}
+
+fn cached_modified_gmt(ctx: &Context, post_id: i64) -> Option<WpGmtDateTime> {
+    ctx.posts
+        .read_cached_post(PostId(post_id))
+        .expect("Read should succeed")
+        .map(|post| post.modified_gmt)
 }
 
 /// Answer the next request with post 42 as `open_post_42` fetched it, as the
@@ -258,488 +297,327 @@ async fn open_post_42(ctx: &Context) -> Arc<PostEditorSession> {
     serve_post_42_unchanged(ctx);
     ctx.service
         .clone()
-        .open_post(PostId(42))
+        .open_post(PostId(42), Some("identity-hash".to_string()))
         .await
         .expect("Opening the post should succeed")
 }
 
+/// Report that the editor sent `request` and got `response` to it.
+async fn report(session: &PostEditorSession, request: EditorRequest, response: EditorResponse) {
+    let request_id = request.request_id.clone();
+    session
+        .record_request_sent(request)
+        .await
+        .expect("Recording the request should succeed");
+    session
+        .record_request_response(request_id, response)
+        .await
+        .expect("Recording the response should succeed");
+}
+
 #[tokio::test]
-async fn test_opening_a_post_gives_the_server_version_as_saved_and_the_working_copy_as_edits() {
+async fn test_the_editor_opens_with_the_working_copy_as_the_latest_post() {
     let ctx = context();
     let session = open_post_42(&ctx).await;
     session
         .record_change(
-            serde_json::to_vec(
-                &json!({ "title": { "raw": "Recorded" }, "plugin_field": "edited" }),
-            )
-            .expect("JSON serializes"),
+            serde_json::to_vec(&json!({ "title": "The user's title" })).expect("JSON serializes"),
         )
+        .await
         .expect("Recording should succeed");
 
     let editor_post = session.editor_post().expect("Reading should succeed");
-    let saved_post: Value = serde_json::from_slice(
-        &editor_post
-            .saved_post
-            .expect("The post is on the server, so it has a saved version"),
-    )
-    .expect("The saved post is JSON");
-    let edits: Value = serde_json::from_slice(&editor_post.edits).expect("The edits are JSON");
+    let post: Value = serde_json::from_slice(&editor_post.post).expect("The post is JSON");
 
-    assert_eq!(
-        ctx.server.requests().len(),
-        1,
-        "Only the first open fetches"
-    );
-    assert_eq!(saved_post["id"], json!(42));
-    assert_eq!(
-        saved_post["title"],
-        json!({ "raw": "On the server", "rendered": "On the server" })
-    );
-    assert_eq!(
-        edits,
-        json!({ "title": "Recorded", "plugin_field": "edited" })
-    );
-}
-
-#[tokio::test]
-async fn test_new_post_has_no_saved_version_and_no_edits_until_something_is_written() {
-    let ctx = context();
-    let session = ctx
-        .service
-        .clone()
-        .open_new_post()
-        .expect("Opening a new post should succeed");
-
-    let editor_post = session.editor_post().expect("Reading should succeed");
-
-    assert_eq!(editor_post.saved_post, None);
-    assert_eq!(
-        serde_json::from_slice::<Value>(&editor_post.edits).expect("The edits are JSON"),
-        json!({})
-    );
-}
-
-fn saved_post_change(modified_gmt: &str, fields: Value) -> Vec<u8> {
-    serde_json::to_vec(&json!({ "modified_gmt": modified_gmt, "fields": fields }))
-        .expect("JSON serializes")
-}
-
-#[tokio::test]
-async fn test_saved_version_matching_the_cache_is_in_sync() {
-    let ctx = context();
-    let session = open_post_42(&ctx).await;
-
-    let check = session
-        .record_saved_post_change(saved_post_change(
-            "2024-01-16T00:00:00",
-            json!({ "title": { "raw": "On the server", "rendered": "On the server" } }),
-        ))
-        .await
-        .expect("Checking should succeed");
-
-    assert_eq!(check, SavedPostCheck::InSync);
-    assert_eq!(ctx.server.requests().len(), 1, "Nothing is fetched");
-}
-
-#[tokio::test]
-async fn test_saved_version_newer_than_the_cache_is_fetched() {
-    let ctx = context();
-    let session = open_post_42(&ctx).await;
-    ctx.server.then(|sent| {
-        response(
-            sent,
-            200,
-            &server_post(42, "Changed elsewhere", "2024-01-17T00:00:00"),
-        )
-    });
-
-    let check = session
-        .record_saved_post_change(saved_post_change(
-            "2024-01-17T00:00:00",
-            json!({ "title": { "raw": "Changed elsewhere" } }),
-        ))
-        .await
-        .expect("Checking should succeed");
-
-    assert_eq!(check, SavedPostCheck::InSync);
-    assert_eq!(ctx.server.requests().len(), 2, "The post is fetched");
-    assert_eq!(
-        ctx.posts
-            .read_cached_post(PostId(42))
-            .expect("Read should succeed")
-            .and_then(|post| post.title)
-            .and_then(|title| title.raw),
-        Some("Changed elsewhere".to_string()),
-        "The fetched post is cached, not the editor's"
-    );
-}
-
-#[tokio::test]
-async fn test_saved_version_older_than_the_cache_gets_the_newer_one() {
-    let ctx = context();
-    let session = open_post_42(&ctx).await;
-
-    let check = session
-        .record_saved_post_change(saved_post_change("2024-01-15T00:00:00", json!({})))
-        .await
-        .expect("Checking should succeed");
-
-    let SavedPostCheck::Newer { saved_post } = check else {
-        panic!("Expected the newer version, got {check:?}");
-    };
-    let saved_post: Value = serde_json::from_slice(&saved_post).expect("The saved post is JSON");
-    assert_eq!(saved_post["modified_gmt"], json!("2024-01-16T00:00:00"));
-}
-
-#[tokio::test]
-async fn test_saved_version_changed_without_the_server_is_a_mismatch_on_the_session() {
-    let ctx = context();
-    let session = open_post_42(&ctx).await;
-
-    let check = session
-        .record_saved_post_change(saved_post_change(
-            "2024-01-16T00:00:00",
-            json!({ "excerpt": { "raw": "Not from the server" }, "modified": "2024-01-16T00:00:00" }),
-        ))
-        .await
-        .expect("Checking should succeed");
-
-    assert_eq!(
-        check,
-        SavedPostCheck::Mismatch {
-            fields: vec!["excerpt".to_string()]
-        }
-    );
+    assert_eq!(editor_post.post_id, Some(PostId(42)));
+    assert_eq!(post["title"], "The user's title");
+    assert_eq!(post["content"], "<p>Content</p>");
     assert_eq!(
         ctx.local_content
             .read_editor_session(&session.id())
             .expect("Read should succeed")
-            .expect("The session exists")
-            .base_mismatch
-            .map(|mismatch| mismatch.fields),
-        Some(vec!["excerpt".to_string()])
+            .and_then(|session| session.editor_identity),
+        Some("identity-hash".to_string())
     );
 }
 
 #[tokio::test]
-async fn test_editor_save_records_the_edits_pushes_and_returns_the_response_unchanged() {
+async fn test_a_new_post_opens_without_an_id() {
+    let ctx = context();
+    let session = ctx
+        .service
+        .clone()
+        .open_new_post(None)
+        .expect("Opening should succeed");
+
+    let editor_post = session.editor_post().expect("Reading should succeed");
+
+    assert_eq!(editor_post.post_id, None);
+    assert!(ctx.server.requests().is_empty(), "Nothing was sent");
+}
+
+#[tokio::test]
+async fn test_each_change_is_a_version_recorded_in_the_session() {
+    let ctx = context();
+    let session = open_post_42(&ctx).await;
+
+    for title in ["One", "Two", "Two"] {
+        session
+            .record_change(serde_json::to_vec(&json!({ "title": title })).expect("JSON serializes"))
+            .await
+            .expect("Recording should succeed");
+    }
+
+    let sessions: Vec<_> = ctx
+        .local_content
+        .read_working_copy_versions(session.working_copy_id())
+        .expect("Read should succeed")
+        .into_iter()
+        .map(|version| version.editor_session_id)
+        .collect();
+    // The version the working copy was created with, then one per change.
+    assert_eq!(sessions, [None, Some(session.id()), Some(session.id())]);
+}
+
+#[tokio::test]
+async fn test_an_editor_save_is_logged_recorded_and_taken_as_the_server_version() {
     let ctx = context();
     let session = open_post_42(&ctx).await;
     let saved = server_post(42, "Saved", "2024-02-01T00:00:00");
-    let saved_for_server = saved.clone();
-    serve_post_42_unchanged(&ctx);
-    ctx.server
-        .then(move |sent| response(sent, 200, &saved_for_server));
 
-    let answer = session
-        .perform_editor_request(editor_request(
-            "PUT",
-            "/wp/v2/posts/42?_locale=user",
-            Some(json!({ "id": 42, "title": "Saved", "meta": { "plugin_meta": "1" } })),
-        ))
-        .await
-        .expect("The save should succeed");
-
-    assert_eq!(answer.status_code, 200);
-    assert_eq!(
-        answer.body,
-        serde_json::to_vec(&saved).expect("JSON serializes")
+    let request = editor_request(
+        "save",
+        "PUT",
+        "/wp/v2/posts/42",
+        Some(json!({ "title": "Saved" })),
     );
-    let update = ctx.server.requests().pop().expect("The update was sent");
-    assert_eq!(update.method, RequestMethod::POST);
-    assert_eq!(update.url, format!("{SITE_URL}/wp-json/wp/v2/posts/42"));
-    // The editor's edits are recorded first, and the update sends what
-    // differs from the post as just fetched.
+    session
+        .record_request_sent(request)
+        .await
+        .expect("Recording should succeed");
+    // What the save sends is recorded before any response arrives.
+    assert_eq!(working_copy_title(&ctx, &session), "Saved");
+
+    session
+        .record_request_response("save".to_string(), editor_response(200, &saved))
+        .await
+        .expect("Recording should succeed");
+
     assert_eq!(
-        update.body,
-        Some(json!({ "title": "Saved", "meta": { "plugin_meta": "1" } }))
+        cached_modified_gmt(&ctx, 42),
+        Some(date("2024-02-01T00:00:00"))
     );
     assert_eq!(
         base_version(&ctx, &session).map(|remote| remote.base_modified_gmt),
-        Some("2024-02-01T00:00:00".parse().expect("Date parses"))
+        Some(date("2024-02-01T00:00:00"))
     );
     assert_eq!(
-        ctx.posts
-            .read_cached_post(PostId(42))
-            .expect("Read should succeed")
-            .and_then(|post| post.title)
-            .and_then(|title| title.raw),
-        Some("Saved".to_string())
+        ctx.server.requests().len(),
+        1,
+        "wordpress-rs sent only the fetch when opening"
     );
-    let session_record = ctx
-        .local_content
-        .read_editor_session(&session.id())
-        .expect("Read should succeed")
-        .expect("The session exists");
-    assert!(session_record.last_recorded_at.is_some());
-    assert_eq!(session_record.unconfirmed_push, None);
+    let requests = session.requests().expect("Reading should succeed");
+    assert_eq!(requests.len(), 1);
+    assert!(
+        !requests[0].request.headers.contains_key("authorization"),
+        "Credentials aren't stored"
+    );
+    assert!(matches!(
+        &requests[0].outcome,
+        Some(EditorRequestOutcome::Response { response, .. }) if response.status_code == 200
+    ));
 }
 
 #[tokio::test]
-async fn test_error_response_goes_back_as_it_is_and_records_no_push() {
+async fn test_a_new_post_the_editor_creates_becomes_the_working_copy_remote_post() {
+    let ctx = context();
+    let session = ctx
+        .service
+        .clone()
+        .open_new_post(None)
+        .expect("Opening should succeed");
+
+    report(
+        &session,
+        editor_request(
+            "create",
+            "POST",
+            "/wp/v2/posts",
+            Some(json!({ "title": "New" })),
+        ),
+        editor_response(201, &server_post(77, "New", "2024-02-01T00:00:00")),
+    )
+    .await;
+
+    assert_eq!(
+        session.remote_post_id().expect("Reading should succeed"),
+        Some(PostId(77))
+    );
+    assert_eq!(working_copy_title(&ctx, &session), "New");
+    assert_eq!(
+        cached_modified_gmt(&ctx, 77),
+        Some(date("2024-02-01T00:00:00"))
+    );
+}
+
+#[tokio::test]
+async fn test_a_read_updates_the_cache_but_not_the_base_version() {
     let ctx = context();
     let session = open_post_42(&ctx).await;
-    let error =
-        json!({ "code": "rest_cannot_edit", "message": "Sorry", "data": { "status": 403 } });
-    let error_for_server = error.clone();
-    serve_post_42_unchanged(&ctx);
-    ctx.server
-        .then(move |sent| response(sent, 403, &error_for_server));
     let before = base_version(&ctx, &session);
 
-    let answer = session
-        .perform_editor_request(editor_request(
-            "PUT",
-            "/wp/v2/posts/42",
-            Some(json!({ "title": "Saved" })),
-        ))
-        .await
-        .expect("An answer, even an error, isn't a failure");
+    report(
+        &session,
+        editor_request("read", "GET", "/wp/v2/posts/42?context=edit", None),
+        editor_response(
+            200,
+            &server_post(42, "Someone else's", "2024-03-01T00:00:00"),
+        ),
+    )
+    .await;
 
-    assert_eq!(answer.status_code, 403);
     assert_eq!(
-        answer.body,
-        serde_json::to_vec(&error).expect("JSON serializes")
+        cached_modified_gmt(&ctx, 42),
+        Some(date("2024-03-01T00:00:00"))
     );
     assert_eq!(base_version(&ctx, &session), before);
 }
 
 #[tokio::test]
-async fn test_new_post_is_created_on_its_first_push() {
+async fn test_responses_that_are_not_the_whole_current_post_are_only_logged() {
     let ctx = context();
-    let session = ctx
-        .service
-        .clone()
-        .open_new_post()
-        .expect("Opening a new post should succeed");
-    session
-        .record_change(
-            serde_json::to_vec(&json!({ "title": "New", "status": "auto-draft" }))
-                .expect("JSON serializes"),
-        )
-        .expect("Recording should succeed");
-    assert!(
-        ctx.server.requests().is_empty(),
-        "Recording a change never pushes"
-    );
-    ctx.server
-        .then(|sent| response(sent, 201, &server_post(77, "New", "2024-03-01T00:00:00")));
+    let session = open_post_42(&ctx).await;
+    let before = base_version(&ctx, &session);
 
-    session.push().await.expect("The push should succeed");
+    // Older than what the cache has.
+    report(
+        &session,
+        editor_request("older", "GET", "/wp/v2/posts/42?context=edit", None),
+        editor_response(200, &server_post(42, "Old", "2024-01-10T00:00:00")),
+    )
+    .await;
+    // Only some of the post's fields.
+    report(
+        &session,
+        editor_request(
+            "partial",
+            "GET",
+            "/wp/v2/posts/42?_fields=title,modified_gmt",
+            None,
+        ),
+        editor_response(200, &server_post(42, "Partial", "2024-05-01T00:00:00")),
+    )
+    .await;
+    // Refused by the server.
+    report(
+        &session,
+        editor_request("refused", "PUT", "/wp/v2/posts/42", Some(json!({}))),
+        editor_response(500, &json!({ "code": "internal_server_error" })),
+    )
+    .await;
+    // Another post.
+    report(
+        &session,
+        editor_request("other", "GET", "/wp/v2/posts/43?context=edit", None),
+        editor_response(200, &server_post(43, "Other", "2024-05-01T00:00:00")),
+    )
+    .await;
 
-    let create = ctx.server.requests().pop().expect("The create was sent");
-    assert_eq!(create.url, format!("{SITE_URL}/wp-json/wp/v2/posts"));
-    let body = create.body.expect("The create has a body");
     assert_eq!(
-        (&body["title"], &body["status"]),
-        (&json!("New"), &json!("draft"))
+        cached_modified_gmt(&ctx, 42),
+        Some(date("2024-01-16T00:00:00"))
     );
-    assert_eq!(
-        session.remote_post_id().expect("Read should succeed"),
-        Some(PostId(77))
-    );
+    assert_eq!(cached_modified_gmt(&ctx, 43), None);
+    assert_eq!(base_version(&ctx, &session), before);
+    assert_eq!(session.requests().expect("Reading should succeed").len(), 4);
 }
 
 #[tokio::test]
-async fn test_push_that_was_never_sent_leaves_nothing_unconfirmed() {
+async fn test_a_request_that_got_no_answer_is_logged_as_such() {
     let ctx = context();
     let session = open_post_42(&ctx).await;
-    serve_post_42_unchanged(&ctx);
-    ctx.server.then(|sent| {
-        failure(
-            sent,
-            RequestExecutionErrorReason::DeviceIsOfflineError {
-                error_message: "offline".to_string(),
-            },
-        )
-    });
 
-    let result = session.push().await;
-
-    assert!(
-        matches!(result, Err(PostEditorError::NotSent { .. })),
-        "{result:?}"
-    );
-    let record = ctx
-        .local_content
-        .read_editor_session(&session.id())
-        .expect("Read should succeed")
-        .expect("The session exists");
-    assert_eq!(record.unconfirmed_push, None);
-}
-
-#[tokio::test]
-async fn test_lost_push_is_settled_when_its_session_is_recovered() {
-    let ctx = context();
-    let session = open_post_42(&ctx).await;
-    // `record_change` takes the whole post, as the editor has it.
     session
-        .record_change(
-            serde_json::to_vec(&server_post(42, "Lost", "2024-01-16T00:00:00"))
-                .expect("JSON serializes"),
-        )
-        .expect("Recording should succeed");
-    serve_post_42_unchanged(&ctx);
-    ctx.server
-        .then(|sent| failure(sent, RequestExecutionErrorReason::HttpTimeoutError));
-    let result = session.push().await;
-    assert!(
-        matches!(result, Err(PostEditorError::MaybeSent { .. })),
-        "{result:?}"
-    );
-    let session_id = session.id();
-    // The app ends without ending the session.
-    drop(session);
-
-    // The push had landed: the server has what it sent.
-    ctx.server
-        .then(|sent| response(sent, 200, &server_post(42, "Lost", "2024-04-01T00:00:00")));
-    let recovered = ctx
-        .service
-        .recover_unfinished_sessions()
+        .record_request_sent(editor_request("offline", "PUT", "/wp/v2/posts/42", None))
         .await
-        .expect("Recovery should succeed");
+        .expect("Recording should succeed");
+    session
+        .record_request_failure("offline".to_string(), "The device is offline".to_string())
+        .await
+        .expect("Recording should succeed");
+    session
+        .record_request_sent(editor_request("lost", "PUT", "/wp/v2/posts/42", None))
+        .await
+        .expect("Recording should succeed");
 
-    assert_eq!(recovered.len(), 1);
-    assert_eq!(recovered[0].id, session_id);
-    assert_eq!(recovered[0].unconfirmed_push, None);
-    let working_copy = ctx
-        .local_content
-        .read_post_working_copy(recovered[0].working_copy_id.clone())
-        .expect("Read should succeed")
-        .expect("The working copy exists");
-    assert_eq!(
-        working_copy
-            .remote_target
-            .remote_post
-            .map(|remote| remote.base_modified_gmt),
-        Some("2024-04-01T00:00:00".parse().expect("Date parses"))
-    );
+    let outcomes: Vec<_> = session
+        .requests()
+        .expect("Reading should succeed")
+        .into_iter()
+        .map(|record| record.outcome)
+        .collect();
+    assert!(matches!(
+        outcomes.as_slice(),
+        [Some(EditorRequestOutcome::Failure { .. }), None]
+    ));
 }
 
 #[tokio::test]
 async fn test_open_sessions_are_not_unfinished() {
     let ctx = context();
-    let _open = open_post_42(&ctx).await;
+    let open = open_post_42(&ctx).await;
+    let closed_id = {
+        let crashed = ctx
+            .service
+            .clone()
+            .open_new_post(None)
+            .expect("Opening should succeed");
+        crashed.id()
+    };
 
-    let recovered = ctx
+    let unfinished: Vec<_> = ctx
         .service
-        .recover_unfinished_sessions()
-        .await
-        .expect("Recovery should succeed");
+        .read_unfinished_sessions()
+        .expect("Reading should succeed")
+        .into_iter()
+        .map(|session| session.id)
+        .collect();
 
-    assert!(recovered.is_empty());
+    assert_eq!(unfinished, [closed_id]);
+    open.end().expect("Ending should succeed");
 }
 
 #[tokio::test]
-async fn test_editor_requests_outside_the_designed_paths_are_refused() {
-    let ctx = context();
-    let session = open_post_42(&ctx).await;
-
-    for (method, path, expected) in [
-        ("POST", "/wp/v2/posts/42/autosaves", "NotDesigned"),
-        ("GET", "/wp/v2/posts/42/revisions", "NotDesigned"),
-        ("DELETE", "/wp/v2/posts/42", "NotDesigned"),
-        ("PUT", "/wp/v2/posts/43", "AnotherPost"),
-        ("GET", "/wp/v2/categories", "NotThePostEndpoint"),
-    ] {
-        let result = session
-            .perform_editor_request(editor_request(method, path, None))
-            .await;
-
-        let kind = match result {
-            Err(PostEditorError::NotDesigned { .. }) => "NotDesigned",
-            Err(PostEditorError::AnotherPost { .. }) => "AnotherPost",
-            Err(PostEditorError::NotThePostEndpoint { .. }) => "NotThePostEndpoint",
-            other => panic!("{method} {path}: unexpected {other:?}"),
-        };
-        assert_eq!(kind, expected, "{method} {path}");
-    }
-    assert_eq!(
-        ctx.server.requests().len(),
-        1,
-        "None of them reached the server"
-    );
-}
-
-#[tokio::test]
-async fn test_editor_read_fills_the_cache_and_returns_the_response_unchanged() {
+async fn test_a_push_after_the_editor_closes_sends_only_what_changed() {
     let ctx = context();
     let session = open_post_42(&ctx).await;
     session
         .record_change(
-            serde_json::to_vec(&json!({ "title": "Not pushed" })).expect("JSON serializes"),
+            serde_json::to_vec(&json!({ "title": "Offline edit" })).expect("JSON serializes"),
         )
-        .expect("Recording should succeed");
-    let on_server = server_post(42, "Changed on the server", "2024-05-01T00:00:00");
-    let on_server_for_server = on_server.clone();
-    ctx.server
-        .then(move |sent| response(sent, 200, &on_server_for_server));
-
-    let answer = session
-        .perform_editor_request(editor_request("GET", "/wp/v2/posts/42?context=edit", None))
         .await
-        .expect("The read should succeed");
-
-    let read = ctx.server.requests().pop().expect("The read was sent");
-    assert_eq!(
-        read.url,
-        format!("{SITE_URL}/wp-json/wp/v2/posts/42?context=edit")
-    );
-    // The editor is the source of truth while it's open, so the working copy
-    // isn't laid over the server's answer.
-    assert_eq!(
-        answer.body,
-        serde_json::to_vec(&on_server).expect("JSON serializes")
-    );
-    assert_eq!(
-        ctx.posts
-            .read_cached_post(PostId(42))
-            .expect("Read should succeed")
-            .and_then(|post| post.title)
-            .and_then(|title| title.raw),
-        Some("Changed on the server".to_string())
-    );
-}
-
-#[tokio::test]
-async fn test_lost_push_that_did_not_land_is_not_recorded() {
-    let ctx = context();
-    let session = open_post_42(&ctx).await;
-    session
-        .record_change(
-            serde_json::to_vec(&server_post(42, "Lost", "2024-01-16T00:00:00"))
-                .expect("JSON serializes"),
-        )
         .expect("Recording should succeed");
+    session.end().expect("Ending should succeed");
     serve_post_42_unchanged(&ctx);
-    ctx.server
-        .then(|sent| failure(sent, RequestExecutionErrorReason::HttpTimeoutError));
-    let _ = session.push().await;
-    let before = base_version(&ctx, &session);
-    drop(session);
-
-    // Someone else changed the post, so the server doesn't have what was sent.
     ctx.server.then(|sent| {
         response(
             sent,
             200,
-            &server_post(42, "Someone else's title", "2024-04-01T00:00:00"),
+            &server_post(42, "Offline edit", "2024-02-01T00:00:00"),
         )
     });
-    let recovered = ctx
-        .service
-        .recover_unfinished_sessions()
-        .await
-        .expect("Recovery should succeed");
 
-    assert_eq!(recovered[0].unconfirmed_push, None);
-    let working_copy = ctx
-        .local_content
-        .read_post_working_copy(recovered[0].working_copy_id.clone())
-        .expect("Read should succeed")
-        .expect("The working copy exists");
-    assert_eq!(working_copy.remote_target.remote_post, before);
+    ctx.service
+        .push_working_copy(session.working_copy_id())
+        .await
+        .expect("The push should succeed");
+
+    let update = ctx.server.requests().pop().expect("The update was sent");
+    assert_eq!(update.body, Some(json!({ "title": "Offline edit" })));
+    assert_eq!(
+        base_version(&ctx, &session).map(|remote| remote.base_modified_gmt),
+        Some(date("2024-02-01T00:00:00"))
+    );
 }
 
 #[tokio::test]
@@ -755,7 +633,10 @@ async fn test_push_after_a_failed_fetch_is_not_sent() {
         )
     });
 
-    let result = session.push().await;
+    let result = ctx
+        .service
+        .push_working_copy(session.working_copy_id())
+        .await;
 
     assert!(
         matches!(result, Err(PostEditorError::NotSent { .. })),
@@ -770,9 +651,9 @@ async fn test_push_is_refused_when_the_server_and_the_working_copy_both_changed(
     let session = open_post_42(&ctx).await;
     session
         .record_change(
-            serde_json::to_vec(&server_post(42, "The user's title", "2024-01-16T00:00:00"))
-                .expect("JSON serializes"),
+            serde_json::to_vec(&json!({ "title": "The user's title" })).expect("JSON serializes"),
         )
+        .await
         .expect("Recording should succeed");
     let before = base_version(&ctx, &session);
     ctx.server.then(|sent| {
@@ -783,7 +664,10 @@ async fn test_push_is_refused_when_the_server_and_the_working_copy_both_changed(
         )
     });
 
-    let result = session.push().await;
+    let result = ctx
+        .service
+        .push_working_copy(session.working_copy_id())
+        .await;
 
     assert_eq!(
         result,
@@ -793,38 +677,4 @@ async fn test_push_is_refused_when_the_server_and_the_working_copy_both_changed(
     );
     assert_eq!(ctx.server.requests().len(), 2, "Nothing was pushed");
     assert_eq!(base_version(&ctx, &session), before);
-}
-
-#[tokio::test]
-async fn test_push_settles_a_lost_push_that_landed_instead_of_reporting_a_conflict() {
-    let ctx = context();
-    let session = open_post_42(&ctx).await;
-    session
-        .record_change(
-            serde_json::to_vec(&server_post(42, "Lost", "2024-01-16T00:00:00"))
-                .expect("JSON serializes"),
-        )
-        .expect("Recording should succeed");
-    serve_post_42_unchanged(&ctx);
-    ctx.server
-        .then(|sent| failure(sent, RequestExecutionErrorReason::HttpTimeoutError));
-    let _ = session.push().await;
-
-    // The lost push had landed, so the server changed, but only by it.
-    ctx.server
-        .then(|sent| response(sent, 200, &server_post(42, "Lost", "2024-07-01T00:00:00")));
-    ctx.server
-        .then(|sent| response(sent, 200, &server_post(42, "Lost", "2024-07-01T00:00:01")));
-    session.push().await.expect("The push should succeed");
-
-    let update = ctx.server.requests().pop().expect("The update was sent");
-    assert_eq!(
-        update.body,
-        Some(json!({})),
-        "Nothing differs from the server"
-    );
-    assert_eq!(
-        base_version(&ctx, &session).map(|remote| remote.base_modified_gmt),
-        Some("2024-07-01T00:00:01".parse().expect("Date parses"))
-    );
 }

@@ -1,11 +1,13 @@
-//! Editing posts in a block editor, with wordpress-rs reading, storing and
-//! pushing the post.
+//! Editing posts in a block editor that makes its own requests for the post,
+//! with wordpress-rs recording what the editor does.
 //!
-//! While the editor is open, it reports each change to the app, which records
-//! it in the post's working copy through a `PostEditorSession`. The editor's
-//! requests for the post go through the session too: a write records the
-//! fields it sends and pushes the working copy, and the server's response
-//! goes back to the editor as it arrived.
+//! While the editor is open, it fetches and saves the post itself, and reports
+//! to the app what it did. The app passes each report to a
+//! `PostEditorSession`, which records it: a change to the post becomes a
+//! version of the post's working copy, and a request becomes an entry in the
+//! session's request log, completed when its response or failure is reported.
+//! Information flows one way, from the editor to wordpress-rs, apart from the
+//! post the editor opens with.
 //!
 //! The choices still open in the design are marked `[decision]`, each in one
 //! place.
@@ -21,7 +23,6 @@ use wp_api::{
     WpAdditionalFields,
     api_client::{IsWpApiClientDelegate, WpApiClient},
     api_error::{RequestExecutionError, RequestExecutionErrorReason},
-    date::WpGmtDateTime,
     middleware::PerformsRequests,
     posts::{AnyPostWithEditContext, PostId, PostMeta, PostRetrieveParams},
     request::{
@@ -32,7 +33,9 @@ use wp_api::{
 use wp_mobile_local_content::{
     LocalContentError,
     db_types::{
-        editor_session::{EditorSession, EditorSessionId},
+        editor_session::{
+            EditorRequest, EditorRequestRecord, EditorResponse, EditorSession, EditorSessionId,
+        },
         working_copy::{
             FeaturedImage, PostWorkingCopy, PostWorkingCopyFields, PublishDate, StatusSetting,
             WorkingCopyCommonFields, WorkingCopyId,
@@ -45,49 +48,16 @@ use wp_mobile_local_content::{
 
 use crate::service::{WpService, local_content::LocalContentService, posts::PostService};
 
-/// A request the editor sends for the post it's editing.
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct EditorRequest {
-    /// The HTTP method, such as `GET`, `POST` or `PUT`.
-    pub method: String,
-    /// The REST API path with its query, such as `/wp/v2/posts/42?context=edit`.
-    pub path: String,
-    /// The JSON body, if the request has one.
-    pub body: Option<Vec<u8>>,
-}
-
-/// What the editor opens with: the version of the post it takes as saved,
-/// and the working copy's changes to it as unsaved edits.
-///
-/// Keeping the working copy's changes out of the saved version means that
-/// when the editor later takes in another copy of the post from the server,
-/// they stay: only the saved version under them changes.
+/// What the editor opens with: the working copy, as the latest version of the
+/// post. The editor fetches the server's version itself.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct EditorPost {
-    /// The post as wordpress-rs last fetched it from the server, a JSON object
-    /// in the REST API's edit shape. `None` for a post that isn't on the
-    /// server yet, for which the editor starts from an empty post.
-    pub saved_post: Option<Vec<u8>>,
-    /// The working copy's fields that differ from `saved_post`, or from an
-    /// empty post if there's none, as a JSON object in the shape the REST API
-    /// takes them in a write.
-    pub edits: Vec<u8>,
-}
-
-/// What wordpress-rs found when the editor reported that its saved version of
-/// the post changed.
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum SavedPostCheck {
-    /// The editor's saved version is the server's version wordpress-rs has.
-    InSync,
-    /// wordpress-rs has a newer version from the server. Give it to the editor
-    /// as its saved version.
-    Newer { saved_post: Vec<u8> },
-    /// The editor's saved version has the same modified date as the server's
-    /// version wordpress-rs has, but differs from it in `fields`. Only
-    /// something other than the server changes it that way, so it's recorded
-    /// on the session, and the editor's version isn't taken as the server's.
-    Mismatch { fields: Vec<String> },
+    /// The post's ID on the server, or `None` for a post that isn't on the
+    /// server yet.
+    pub post_id: Option<PostId>,
+    /// Every field of the working copy, as a JSON object in the shape the REST
+    /// API takes it in a write.
+    pub post: Vec<u8>,
 }
 
 /// The server's response, as it arrived.
@@ -123,21 +93,12 @@ pub enum PostEditorError {
     /// The server reported success, but its response isn't a post.
     #[error("The server's response to a push isn't a post: {reason}")]
     UnreadablePushResponse { status_code: u32, reason: String },
-    #[error("{method} {path} isn't a request for a post")]
-    NotThePostEndpoint { method: String, path: String },
-    #[error("{path} is for another post than the session's")]
-    AnotherPost { path: String },
-    #[error("The post isn't on the server yet")]
-    NotOnServer,
     /// The post changed on the server since the working copy's base version,
     /// and the working copy differs from it in `differing_fields`. Which side
     /// changed each field isn't known, since the cache holds only the server's
     /// latest version. Nothing was sent.
     #[error("The post changed on the server, and differs in {differing_fields:?}")]
     Conflict { differing_fields: Vec<String> },
-    /// Autosaves, previews, revisions and trashing aren't designed yet.
-    #[error("{method} {path} isn't designed yet")]
-    NotDesigned { method: String, path: String },
 }
 
 impl From<LocalContentError> for PostEditorError {
@@ -175,7 +136,7 @@ impl From<RemotePostConversionError> for PostEditorError {
     }
 }
 
-/// Editing a site's posts: the editor's changes and requests go through here.
+/// Editing a site's posts: what the editor does is recorded through here.
 ///
 /// Open a post with `open_post` or `open_new_post`, which start an editor
 /// session, and keep the returned `PostEditorSession` while the editor is
@@ -217,9 +178,14 @@ impl PostEditorService {
     /// Uses the post's working copy if it has one, and otherwise creates one
     /// from the post in the cache. Fetches the post if the cache doesn't have
     /// it.
+    ///
+    /// `editor_identity` is who the editor makes its requests as, in a form
+    /// that isn't a credential, such as a hash of its token. It's recorded on
+    /// the session as given, and nothing else uses it yet.
     pub async fn open_post(
         self: Arc<Self>,
         post_id: PostId,
+        editor_identity: Option<String>,
     ) -> Result<Arc<PostEditorSession>, PostEditorError> {
         let cached = match self.posts.read_cached_post(post_id)? {
             Some(post) => post,
@@ -238,12 +204,18 @@ impl PostEditorService {
                 PostWorkingCopyFields::from_remote(&cached)?,
             )?,
         };
-        self.start_session(working_copy.id)
+        self.start_session(working_copy.id, editor_identity)
     }
 
     /// Start an editor session for a new post: a working copy with no remote
-    /// post.
-    pub fn open_new_post(self: Arc<Self>) -> Result<Arc<PostEditorSession>, PostEditorError> {
+    /// post. The editor creates the post on the server when it first saves
+    /// it, and reporting that save links the working copy to the new post.
+    ///
+    /// `editor_identity` is recorded as `open_post` records it.
+    pub fn open_new_post(
+        self: Arc<Self>,
+        editor_identity: Option<String>,
+    ) -> Result<Arc<PostEditorSession>, PostEditorError> {
         let working_copy = self.local_content.create_post_working_copy(
             WorkingCopyRemoteTarget {
                 site: self.site.clone(),
@@ -251,14 +223,14 @@ impl PostEditorService {
             },
             empty_post_fields(),
         )?;
-        self.start_session(working_copy.id)
+        self.start_session(working_copy.id, editor_identity)
     }
 
     /// Send a working copy to the server, creating the post there if it
     /// doesn't exist yet, and return the server's response.
     ///
-    /// Use it after the editor has closed. While it's open, push through its
-    /// session, which also records the push on the session.
+    /// Use it after the editor has closed. While it's open, the editor saves
+    /// the post itself.
     ///
     /// Updating a post fetches it first, then sends only the fields that
     /// differ from the server's. Fails with `Conflict` if the post changed on
@@ -270,50 +242,35 @@ impl PostEditorService {
         &self,
         working_copy_id: WorkingCopyId,
     ) -> Result<ServerResponse, PostEditorError> {
-        self.push(&working_copy_id, None).await
+        self.push(&working_copy_id).await
     }
 
     /// The editor sessions on this site that didn't end normally, such as
-    /// when the app crashed or the system ended it, oldest first.
+    /// when the app crashed or the system ended it, oldest first. Sessions
+    /// open in this process aren't included.
     ///
-    /// A push such a session was waiting on is settled first, if it updated
-    /// a post: the post is fetched, and if it holds what the push sent, the
-    /// push is recorded. Sessions open in this process aren't included.
-    pub async fn recover_unfinished_sessions(&self) -> Result<Vec<EditorSession>, PostEditorError> {
+    /// What each recorded is in its working copy's versions and in its
+    /// request log.
+    pub fn read_unfinished_sessions(&self) -> Result<Vec<EditorSession>, PostEditorError> {
         let open = self
             .open_sessions
             .lock()
             .expect("The open sessions lock isn't poisoned")
             .clone();
-        let unfinished: Vec<EditorSession> = self
-            .local_content
-            .read_unfinished_editor_sessions()?
-            .into_iter()
-            .filter(|session| !open.contains(&session.id))
-            .collect();
-
-        let mut recovered = Vec::new();
-        for session in unfinished {
+        let mut unfinished = Vec::new();
+        for session in self.local_content.read_unfinished_editor_sessions()? {
+            if open.contains(&session.id) {
+                continue;
+            }
             let on_this_site = self
                 .local_content
                 .read_post_working_copy(session.working_copy_id.clone())?
                 .is_some_and(|working_copy| working_copy.remote_target.site == self.site);
-            if !on_this_site {
-                continue;
+            if on_this_site {
+                unfinished.push(session);
             }
-            if let Err(err) = self.settle_unconfirmed_push(&session).await {
-                log::warn!(
-                    "Settling the push of editor session {} failed: {err}",
-                    session.id.0
-                );
-            }
-            recovered.push(
-                self.local_content
-                    .read_editor_session(&session.id)?
-                    .unwrap_or(session),
-            );
         }
-        Ok(recovered)
+        Ok(unfinished)
     }
 }
 
@@ -339,10 +296,11 @@ impl PostEditorService {
     fn start_session(
         self: Arc<Self>,
         working_copy_id: WorkingCopyId,
+        editor_identity: Option<String>,
     ) -> Result<Arc<PostEditorSession>, PostEditorError> {
         let session = self
             .local_content
-            .create_editor_session(working_copy_id.clone())?;
+            .create_editor_session(working_copy_id.clone(), editor_identity)?;
         self.open_sessions
             .lock()
             .expect("The open sessions lock isn't poisoned")
@@ -351,6 +309,7 @@ impl PostEditorService {
             service: self,
             id: session.id,
             working_copy_id,
+            reports: AsyncMutex::new(()),
         }))
     }
 
@@ -397,12 +356,10 @@ impl PostEditorService {
             .post(ApiEndpointUrl::new(url), Some(body))
     }
 
-    /// Push a working copy, recording the attempt on `session_id` if it's
-    /// given, and return the server's response.
+    /// Push a working copy and return the server's response.
     async fn push(
         &self,
         working_copy_id: &WorkingCopyId,
-        session_id: Option<&EditorSessionId>,
     ) -> Result<ServerResponse, PostEditorError> {
         // [decision] One push at a time per working copy: a push waits for one
         // already in flight.
@@ -419,43 +376,19 @@ impl PostEditorService {
             // A new post: every field goes into the create.
             None => (None, working_copy.fields.to_rest_fields()),
             Some(remote_post) => {
-                let (remote_post, changes) = self
-                    .changes_to_push(working_copy_id, remote_post, session_id)
-                    .await?;
+                let changes = self.changes_to_push(&working_copy, remote_post).await?;
                 (Some(remote_post), changes)
             }
         };
         let request = self.write_request(remote_post.map(|remote_post| remote_post.post_id), &body);
-        let body = serde_json::to_string(&body).expect("A JSON object always serializes");
 
-        // [decision] Record the attempt before sending, so a push whose
-        // answer is lost is found later. Only a push through a session is
-        // recorded, since the record lives on the session.
-        if let Some(session_id) = session_id {
-            self.local_content
-                .record_unconfirmed_push(session_id, remote_post, &body)?;
-        }
-
-        let result = self
+        let response = self
             .api_client
             .posts()
             .perform(Arc::new(request), None)
-            .await;
-        let response = match result {
-            Ok(response) => response,
-            Err(err) => {
-                let err = push_failure(err);
-                if let (PostEditorError::NotSent { .. }, Some(session_id)) = (&err, session_id) {
-                    self.local_content.clear_unconfirmed_push(session_id)?;
-                }
-                return Err(err);
-            }
-        };
-        // The server answered, whatever the status, so nothing is unconfirmed.
-        if let Some(session_id) = session_id {
-            self.local_content.clear_unconfirmed_push(session_id)?;
-        }
-        if !is_success(&response) {
+            .await
+            .map_err(push_failure)?;
+        if !is_success(response.status_code) {
             return Ok(ServerResponse::from(response));
         }
 
@@ -477,20 +410,17 @@ impl PostEditorService {
         Ok(ServerResponse::from(response))
     }
 
-    /// Fetch the post a working copy updates, and return its remote post
-    /// and the fields that differ from the server's.
+    /// Fetch the post a working copy updates, and return the fields that
+    /// differ from the server's.
     ///
-    /// The fetch settles a push the session is waiting on first, so a push
-    /// whose answer was lost isn't mistaken for someone else's change. Fails
-    /// with `Conflict` if the post changed on the server since the base
+    /// Fails with `Conflict` if the post changed on the server since the base
     /// version and the working copy differs from it, and with `NotSent` if
     /// the fetch failed.
     async fn changes_to_push(
         &self,
-        working_copy_id: &WorkingCopyId,
+        working_copy: &PostWorkingCopy,
         remote_post: RemotePostReference,
-        session_id: Option<&EditorSessionId>,
-    ) -> Result<(RemotePostReference, Map<String, Value>), PostEditorError> {
+    ) -> Result<Map<String, Value>, PostEditorError> {
         // [decision] Fetch the post first, to check for a conflict and to send
         // only what changed.
         let server_post =
@@ -499,20 +429,6 @@ impl PostEditorService {
                 .map_err(|err| PostEditorError::NotSent {
                     reason: format!("Fetching the post before pushing failed: {err}"),
                 })?;
-        if let Some(session) = session_id
-            .map(|session_id| self.local_content.read_editor_session(session_id))
-            .transpose()?
-            .flatten()
-        {
-            self.settle_with(&session, &server_post)?;
-        }
-
-        // The base version may have moved while settling.
-        let working_copy = self.read_working_copy(working_copy_id)?;
-        let remote_post = working_copy
-            .remote_target
-            .remote_post
-            .unwrap_or(remote_post);
         let server_fields = PostWorkingCopyFields::from_remote(&server_post)?;
         // [decision] Send only the fields that differ from the server's.
         let changes = working_copy.fields.rest_fields_changed_from(&server_fields);
@@ -520,10 +436,11 @@ impl PostEditorService {
         if server_post.modified_gmt != remote_post.base_modified_gmt {
             if changes.is_empty() {
                 // The server already has what the user has: nothing conflicts.
-                let remote_post = RemotePostReference::from_remote(&server_post);
-                self.local_content
-                    .record_post_working_copy_push(working_copy_id.clone(), remote_post)?;
-                return Ok((remote_post, changes));
+                self.local_content.record_post_working_copy_push(
+                    working_copy.id.clone(),
+                    RemotePostReference::from_remote(&server_post),
+                )?;
+                return Ok(changes);
             }
             // [not designed] What happens to a conflict. The working copy keeps
             // everything, and nothing is sent.
@@ -531,106 +448,28 @@ impl PostEditorService {
                 differing_fields: changes.into_iter().map(|(key, _)| key).collect(),
             });
         }
-        Ok((remote_post, changes))
-    }
-
-    /// Find out whether the push a session was waiting on landed, and record
-    /// it if it did. The unconfirmed push is cleared either way, and the
-    /// working copy is compared with the server as usual.
-    async fn settle_unconfirmed_push(
-        &self,
-        session: &EditorSession,
-    ) -> Result<(), PostEditorError> {
-        // [decision] How to find a post a lost create may have made: not
-        // designed. The unconfirmed create stays on the session for the app to
-        // see.
-        let Some(remote_post) = session
-            .unconfirmed_push
-            .as_ref()
-            .and_then(|push| push.remote_post)
-        else {
-            return Ok(());
-        };
-        let server_post = self.fetch_post(remote_post.post_id).await?;
-        self.settle_with(session, &server_post)
-    }
-
-    /// Settle the session's unconfirmed update with `server_post`, the post as
-    /// just fetched: the push landed if the post holds every field it sent.
-    fn settle_with(
-        &self,
-        session: &EditorSession,
-        server_post: &AnyPostWithEditContext,
-    ) -> Result<(), PostEditorError> {
-        let Some(push) = &session.unconfirmed_push else {
-            return Ok(());
-        };
-        if push.remote_post.is_none() {
-            return Ok(());
-        }
-        let sent: Map<String, Value> =
-            serde_json::from_str(&push.body).map_err(|err| PostEditorError::LocalContent {
-                reason: format!("The unconfirmed push's body isn't a JSON object: {err}"),
-            })?;
-        if push_landed(&sent, &PostWorkingCopyFields::from_remote(server_post)?) {
-            self.local_content.record_post_working_copy_push(
-                session.working_copy_id.clone(),
-                RemotePostReference::from_remote(server_post),
-            )?;
-        }
-        self.local_content.clear_unconfirmed_push(&session.id)?;
-        Ok(())
-    }
-
-    /// Send the editor's read of the post as it is, with the session's
-    /// authentication. A successful response fills the cache, if it's a post
-    /// with the edit context.
-    async fn fetch_for_editor(
-        &self,
-        post_id: PostId,
-        query: Option<&str>,
-    ) -> Result<WpNetworkResponse, PostEditorError> {
-        let mut url = self
-            .api_url_resolver
-            .resolve(
-                "wp/v2".to_string(),
-                vec!["posts".to_string(), post_id.0.to_string()],
-            )
-            .inner
-            .clone();
-        if let Some(query) = query {
-            url.query_pairs_mut()
-                .extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
-        }
-        let auth_provider = self.api_client.posts().get_delegate().auth_provider.clone();
-        let request: WpNetworkRequest =
-            InnerRequestBuilder::new(auth_provider).get(ApiEndpointUrl::new(url));
-        let response = self
-            .api_client
-            .posts()
-            .perform(Arc::new(request), None)
-            .await
-            .map_err(push_failure)?;
-        if is_success(&response)
-            && let Ok(post) = serde_json::from_slice::<AnyPostWithEditContext>(&response.body)
-        {
-            self.posts.cache_post_from_server(&post)?;
-        }
-        Ok(response)
+        Ok(changes)
     }
 }
 
 /// One editor session: a post open in the editor, from opening it to closing
 /// it.
 ///
-/// While the editor is open, the editor is the source of truth: record each
-/// change with `record_change`, and send the editor's requests for the post
-/// through `perform_editor_request`. Call `end` when the editor closes.
+/// While the editor is open, it's the source of truth, and it makes its own
+/// requests for the post. Pass each of its reports here: `record_change` for a
+/// change to the post, `record_request_sent` when it sends a request, and
+/// `record_request_response` or `record_request_failure` when the request
+/// completes. Call `end` when the editor closes.
+///
+/// Reports are recorded one at a time, in the order they arrive.
 #[derive(uniffi::Object)]
 pub struct PostEditorSession {
     service: Arc<PostEditorService>,
     id: EditorSessionId,
     working_copy_id: WorkingCopyId,
+    /// Held while a report is recorded, so the working copy's versions and
+    /// the request log follow the order the reports arrived in.
+    reports: AsyncMutex<()>,
 }
 
 impl Drop for PostEditorSession {
@@ -661,150 +500,99 @@ impl PostEditorSession {
             .map(|remote_post| remote_post.post_id))
     }
 
-    /// What the editor opens with: the cached post as its saved version, and
-    /// the working copy's changes to it as edits.
+    /// What the editor opens with: the working copy, as the latest version of
+    /// the post.
     pub fn editor_post(&self) -> Result<EditorPost, PostEditorError> {
         let working_copy = self.service.read_working_copy(&self.working_copy_id)?;
-        let cached = match working_copy.remote_target.remote_post {
-            Some(remote_post) => self.service.posts.read_cached_post(remote_post.post_id)?,
-            None => None,
-        };
-        let (saved_post, base) = match &cached {
-            Some(cached) => (
-                Some(serde_json::to_vec(cached).expect("A post always serializes")),
-                PostWorkingCopyFields::from_remote(cached)?,
-            ),
-            None => (None, empty_post_fields()),
-        };
-        let edits = working_copy.fields.rest_fields_changed_from(&base);
         Ok(EditorPost {
-            saved_post,
-            edits: serde_json::to_vec(&edits).expect("A JSON object always serializes"),
+            post_id: working_copy
+                .remote_target
+                .remote_post
+                .map(|remote_post| remote_post.post_id),
+            post: serde_json::to_vec(&working_copy.fields.to_rest_fields())
+                .expect("A JSON object always serializes"),
         })
     }
 
-    /// Check the editor's saved version of the post against the server's
-    /// version wordpress-rs has, after the editor reported that it changed.
-    ///
-    /// `change` is a JSON object: `modified_gmt`, the saved version's modified
-    /// date, and `fields`, the fields that changed in it, in the REST API's
-    /// edit shape. The editor's version is never taken as the server's: if
-    /// it's newer than the cached one, wordpress-rs fetches the post.
-    pub async fn record_saved_post_change(
-        &self,
-        change: Vec<u8>,
-    ) -> Result<SavedPostCheck, PostEditorError> {
-        let Some(post_id) = self.remote_post_id()? else {
-            return Ok(SavedPostCheck::InSync);
-        };
-        let change = json_object(&change)?;
-        let invalid = |reason: &str| PostEditorError::InvalidEditorPost {
-            reason: format!("The saved post change {reason}"),
-        };
-        let editor_modified: WpGmtDateTime = change
-            .get("modified_gmt")
-            .cloned()
-            .and_then(|modified| serde_json::from_value(modified).ok())
-            .ok_or_else(|| invalid("has no valid `modified_gmt`"))?;
-        let changed_fields = match change.get("fields") {
-            Some(Value::Object(fields)) => fields.clone(),
-            None => Map::new(),
-            Some(_) => return Err(invalid("has `fields` that isn't an object")),
-        };
-
-        let mut server = match self.service.posts.read_cached_post(post_id)? {
-            Some(cached) if cached.modified_gmt.0 >= editor_modified.0 => cached,
-            // The editor took in a newer version than wordpress-rs has, or
-            // wordpress-rs has none.
-            _ => self.service.fetch_post(post_id).await?,
-        };
-        if server.modified_gmt.0 < editor_modified.0 {
-            // Still older after fetching: the server doesn't have the
-            // editor's version, so it didn't come from the server.
-            server = self.service.fetch_post(post_id).await?;
-        }
-        if server.modified_gmt.0 > editor_modified.0 {
-            return Ok(SavedPostCheck::Newer {
-                saved_post: serde_json::to_vec(&server).expect("A post always serializes"),
-            });
-        }
-
-        let server_fields = PostWorkingCopyFields::from_remote(&server)?;
-        let mut editor_fields = server_fields.clone();
-        editor_fields.apply_editor_edits(&changed_fields)?;
-        let differing: Vec<String> = editor_fields
-            .rest_fields_changed_from(&server_fields)
-            .into_iter()
-            .map(|(key, _)| key)
-            .collect();
-        if differing.is_empty() {
-            return Ok(SavedPostCheck::InSync);
-        }
-        self.service
-            .local_content
-            .record_base_mismatch(&self.id, &differing)?;
-        Ok(SavedPostCheck::Mismatch { fields: differing })
-    }
-
-    /// Record the post, as the editor has it now, in the working copy. Call it
-    /// after every change, whether or not the user saves.
+    /// Record the post, as the editor has it now, as a version of the working
+    /// copy. Call it after every change, whether or not the user saves.
     ///
     /// `post` is the whole post as a JSON object in the REST API's edit shape.
-    pub fn record_change(&self, post: Vec<u8>) -> Result<(), PostEditorError> {
+    pub async fn record_change(&self, post: Vec<u8>) -> Result<(), PostEditorError> {
+        let _report = self.reports.lock().await;
         let post = json_object(&post)?;
         let mut working_copy = self.service.read_working_copy(&self.working_copy_id)?;
         working_copy.fields.apply_editor_post(&post)?;
+        self.record_fields(&working_copy.fields)
+    }
+
+    /// Record that the editor sent `request`.
+    ///
+    /// A request that writes the session's post, creating or updating it,
+    /// holds exactly what the editor is sending, so its fields are also
+    /// recorded as a version of the working copy: change reports can be a
+    /// moment behind.
+    pub async fn record_request_sent(&self, request: EditorRequest) -> Result<(), PostEditorError> {
+        let _report = self.reports.lock().await;
         self.service
             .local_content
-            .save_post_working_copy(working_copy.id, working_copy.fields)?;
-        self.service
-            .local_content
-            .record_editor_session_change(self.id.clone())?;
-        // [decision] When a new post is created on the server: on the first
-        // save, through `push`, never here. Nothing reaches the server before
-        // the user asks for it.
+            .record_editor_request_sent(&self.id, &request)?;
+        let is_write = matches!(
+            classify_request(&request, self.remote_post_id()?),
+            Some(PostRequest::Create | PostRequest::Update)
+        );
+        if let (true, Some(body)) = (is_write, request.body.as_deref()) {
+            let mut working_copy = self.service.read_working_copy(&self.working_copy_id)?;
+            working_copy
+                .fields
+                .apply_editor_edits(&json_object(body)?)?;
+            self.record_fields(&working_copy.fields)?;
+        }
         Ok(())
     }
 
-    /// Answer a request from the editor for this post.
+    /// Record the response the editor got to a request it reported sending.
     ///
-    /// A write (`POST`, `PUT` or `PATCH`) means the user saved: the fields it
-    /// sends are recorded in the working copy, and the working copy is
-    /// pushed. A read (`GET`) is sent to the server as it is, and a successful
-    /// one fills the cache. Either way, the server's response comes back as it
-    /// arrived: while the editor is open, it's the source of truth, and the
-    /// working copy follows it.
-    ///
-    /// A write fails as `PostEditorService::push_working_copy` does. Fails with
-    /// `NotDesigned` for autosaves, revisions and trashing.
-    pub async fn perform_editor_request(
+    /// If the response is a successful one with the session's whole post in
+    /// the edit context, wordpress-rs also takes it as the server's version:
+    /// see `take_server_post`. The response is recorded first, so it's kept
+    /// even when that fails.
+    pub async fn record_request_response(
         &self,
-        request: EditorRequest,
-    ) -> Result<ServerResponse, PostEditorError> {
-        let remote_post_id = self.remote_post_id()?;
-        match classify_editor_request(&request, remote_post_id)? {
-            EditorRequestKind::Write => self.record_and_push(request.body.as_deref()).await,
-            EditorRequestKind::Read { query } => {
-                let post_id = remote_post_id.ok_or(PostEditorError::NotOnServer)?;
-                self.service
-                    .fetch_for_editor(post_id, query.as_deref())
-                    .await
-                    .map(ServerResponse::from)
-            }
-            EditorRequestKind::NotDesigned => Err(PostEditorError::NotDesigned {
-                method: request.method,
-                path: request.path,
-            }),
-        }
+        request_id: String,
+        response: EditorResponse,
+    ) -> Result<(), PostEditorError> {
+        let _report = self.reports.lock().await;
+        let record = self.service.local_content.record_editor_request_response(
+            &self.id,
+            &request_id,
+            &response,
+        )?;
+        self.take_server_post(&record, &response)
     }
 
-    /// Push the working copy, creating the post on the server if it isn't
-    /// there yet, and return the server's response. For a new post, call it
-    /// when the user first saves, then give the editor `remote_post_id`.
-    pub async fn push(&self) -> Result<ServerResponse, PostEditorError> {
-        self.service
-            .push(&self.working_copy_id, Some(&self.id))
-            .await
+    /// Record that a request the editor reported sending got no answer, such
+    /// as when the device was offline.
+    pub async fn record_request_failure(
+        &self,
+        request_id: String,
+        reason: String,
+    ) -> Result<(), PostEditorError> {
+        let _report = self.reports.lock().await;
+        Ok(self.service.local_content.record_editor_request_failure(
+            &self.id,
+            &request_id,
+            &reason,
+        )?)
+    }
+
+    /// The requests the editor reported in this session, in the order it
+    /// reported sending them.
+    pub fn requests(&self) -> Result<Vec<EditorRequestRecord>, PostEditorError> {
+        Ok(self
+            .service
+            .local_content
+            .read_editor_session_requests(self.id.clone())?)
     }
 
     /// End the session normally, when the editor closes.
@@ -817,49 +605,80 @@ impl PostEditorSession {
 }
 
 impl PostEditorSession {
-    async fn record_and_push(
+    fn record_fields(&self, fields: &PostWorkingCopyFields) -> Result<(), PostEditorError> {
+        Ok(self
+            .service
+            .local_content
+            .record_post_working_copy_change_in_session(&self.id, &self.working_copy_id, fields)?)
+    }
+
+    /// Take a response the editor got as the server's version of the post.
+    ///
+    /// Only a successful response for the session's post counts, and only one
+    /// whose body is the whole post in the edit context: a read without
+    /// `_fields`, or a create or an update, whose responses always are.
+    fn take_server_post(
         &self,
-        body: Option<&[u8]>,
-    ) -> Result<ServerResponse, PostEditorError> {
-        // Changes are recorded in the background, so the working copy can be a
-        // moment behind the editor. The write holds exactly what the editor is
-        // sending, so it's recorded first.
-        let edits = body.map(json_object).transpose()?.unwrap_or_default();
-        let mut working_copy = self.service.read_working_copy(&self.working_copy_id)?;
-        working_copy.fields.apply_editor_edits(&edits)?;
-        self.service
-            .local_content
-            .save_post_working_copy(working_copy.id, working_copy.fields)?;
-        self.service
-            .local_content
-            .record_editor_session_change(self.id.clone())?;
-        self.push().await
+        record: &EditorRequestRecord,
+        response: &EditorResponse,
+    ) -> Result<(), PostEditorError> {
+        if !is_success(response.status_code) {
+            return Ok(());
+        }
+        let Some(kind) = classify_request(&record.request, self.remote_post_id()?) else {
+            return Ok(());
+        };
+        let Ok(post) = serde_json::from_slice::<AnyPostWithEditContext>(&response.body) else {
+            return Ok(());
+        };
+
+        // [decision] The editor's responses update the cache, through the same
+        // path wordpress-rs's own responses do, unless the cache already has a
+        // newer version. The response itself stays in the request log.
+        let cached_is_newer = self
+            .service
+            .posts
+            .read_cached_post(post.id)?
+            .is_some_and(|cached| cached.modified_gmt.0 > post.modified_gmt.0);
+        if !cached_is_newer {
+            self.service.posts.cache_post_from_server(&post)?;
+        }
+
+        // [decision] A write the server accepted holds what the editor sent, so
+        // its response is the working copy's base version, and a create links
+        // the working copy to the new post. A read leaves the base version
+        // alone: the working copy's changes still start from the version they
+        // were made on.
+        if matches!(kind, PostRequest::Create | PostRequest::Update) {
+            self.service.local_content.record_post_working_copy_push(
+                self.working_copy_id.clone(),
+                RemotePostReference::from_remote(&post),
+            )?;
+        }
+        Ok(())
     }
 }
 
 // Internal helpers
 
-enum EditorRequestKind {
-    Read { query: Option<String> },
-    Write,
-    NotDesigned,
+/// A request for the session's post, told apart by its method and path.
+enum PostRequest {
+    /// Reads the whole post.
+    Read,
+    /// Creates the post, for a session whose post isn't on the server yet.
+    Create,
+    Update,
 }
 
-/// The placeholder ID the editor uses for a post that isn't on the server yet.
-const PLACEHOLDER_POST_ID: i64 = -1;
-
-/// Tell the editor's request apart by its method and path, and check that it's
-/// for the session's post.
-fn classify_editor_request(
+/// What `request` does to the session's post, or `None` if it isn't one of
+/// the requests in `PostRequest`, such as a read with `_fields`, or a request
+/// for an autosave or another post.
+fn classify_request(
     request: &EditorRequest,
     remote_post_id: Option<PostId>,
-) -> Result<EditorRequestKind, PostEditorError> {
-    let not_the_post_endpoint = || PostEditorError::NotThePostEndpoint {
-        method: request.method.clone(),
-        path: request.path.clone(),
-    };
+) -> Option<PostRequest> {
     let (path, query) = match request.path.split_once('?') {
-        Some((path, query)) => (path, Some(query.to_string())),
+        Some((path, query)) => (path, Some(query)),
         None => (request.path.as_str(), None),
     };
     let segments: Vec<&str> = path
@@ -868,29 +687,22 @@ fn classify_editor_request(
         .collect();
     let segments = match segments.as_slice() {
         ["wp", "v2", "sites", _, rest @ ..] | ["wp", "v2", rest @ ..] => rest,
-        _ => return Err(not_the_post_endpoint()),
+        _ => return None,
     };
     let method = request.method.to_ascii_uppercase();
-    let is_write = matches!(method.as_str(), "POST" | "PUT" | "PATCH");
-
-    match segments {
-        ["posts"] if method == "POST" => Ok(EditorRequestKind::Write),
-        ["posts", id, rest @ ..] => {
-            let id: i64 = id.parse().map_err(|_| not_the_post_endpoint())?;
-            if id != PLACEHOLDER_POST_ID && Some(PostId(id)) != remote_post_id {
-                return Err(PostEditorError::AnotherPost {
-                    path: request.path.clone(),
+    match (segments, method.as_str()) {
+        (["posts"], "POST") if remote_post_id.is_none() => Some(PostRequest::Create),
+        (["posts", id], method) if id.parse().ok().map(PostId) == remote_post_id => match method {
+            "GET" => {
+                let partial = query.is_some_and(|query| {
+                    url::form_urlencoded::parse(query.as_bytes()).any(|(key, _)| key == "_fields")
                 });
+                (!partial).then_some(PostRequest::Read)
             }
-            match (rest, method.as_str()) {
-                // Autosaves, previews and revisions are below the post's path.
-                ([_, ..], _) | ([], "DELETE") => Ok(EditorRequestKind::NotDesigned),
-                ([], "GET") => Ok(EditorRequestKind::Read { query }),
-                ([], _) if is_write => Ok(EditorRequestKind::Write),
-                _ => Err(not_the_post_endpoint()),
-            }
-        }
-        _ => Err(not_the_post_endpoint()),
+            "POST" | "PUT" | "PATCH" => Some(PostRequest::Update),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -912,23 +724,8 @@ fn push_failure(err: RequestExecutionError) -> PostEditorError {
     }
 }
 
-/// Whether the server's post holds every field `sent` sent: for `meta`, every
-/// meta key it sent.
-fn push_landed(sent: &Map<String, Value>, server: &PostWorkingCopyFields) -> bool {
-    let server = server.to_rest_fields();
-    sent.iter().all(|(key, value)| match (key.as_str(), value) {
-        ("meta", Value::Object(meta)) => meta.iter().all(|(meta_key, meta_value)| {
-            server
-                .get("meta")
-                .and_then(|server_meta| server_meta.get(meta_key))
-                == Some(meta_value)
-        }),
-        _ => server.get(key) == Some(value),
-    })
-}
-
-fn is_success(response: &WpNetworkResponse) -> bool {
-    (200..300).contains(&response.status_code)
+fn is_success(status_code: u32) -> bool {
+    (200..300).contains(&status_code)
 }
 
 fn json_object(bytes: &[u8]) -> Result<Map<String, Value>, PostEditorError> {

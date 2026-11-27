@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tempfile::TempDir;
 use wp_api::{
     JsonValue, WpAdditionalFields,
@@ -14,6 +14,7 @@ use wp_mobile::service::local_content::LocalContentService;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
+        editor_session::EditorRequest,
         working_copy::{
             FeaturedImage, PageWorkingCopyFields, PostWorkingCopyFields, PublishDate,
             StatusSetting, WorkingCopyCommonFields, WorkingCopyId,
@@ -369,7 +370,7 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
 }
 
 #[test]
-fn test_unfinished_editor_session_and_its_unconfirmed_push_survive_reopening_the_database() {
+fn test_unfinished_editor_session_and_what_it_recorded_survive_reopening_the_database() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let (working_copy_id, unfinished_id) = {
         let service = open_service(&dir);
@@ -378,24 +379,38 @@ fn test_unfinished_editor_session_and_its_unconfirmed_push_survive_reopening_the
             .expect("Create should succeed")
             .id;
         let ended = service
-            .create_editor_session(working_copy_id.clone())
+            .create_editor_session(working_copy_id.clone(), None)
             .expect("Creating a session should succeed");
         service
             .end_editor_session(ended.id)
             .expect("Ending a session should succeed");
         let unfinished = service
-            .create_editor_session(working_copy_id.clone())
+            .create_editor_session(working_copy_id.clone(), Some("identity-hash".to_string()))
             .expect("Creating a session should succeed");
         service
-            .record_editor_session_change(unfinished.id.clone())
+            .record_post_working_copy_change_in_session(
+                &unfinished.id,
+                &working_copy_id,
+                &post("Edited in the editor"),
+            )
             .expect("Recording a change should succeed");
         service
-            .record_unconfirmed_push(&unfinished.id, None, r#"{"title":"Draft"}"#)
-            .expect("Recording the push should succeed");
+            .record_editor_request_sent(
+                &unfinished.id,
+                &EditorRequest {
+                    request_id: "save".to_string(),
+                    method: "POST".to_string(),
+                    path: "/wp/v2/posts".to_string(),
+                    headers: HashMap::new(),
+                    body: Some(br#"{"title":"Edited in the editor"}"#.to_vec()),
+                },
+            )
+            .expect("Recording the request should succeed");
         (working_copy_id, unfinished.id)
     };
 
-    let unfinished = open_service(&dir)
+    let service = open_service(&dir);
+    let unfinished = service
         .read_unfinished_editor_sessions()
         .expect("Read should succeed");
 
@@ -403,14 +418,24 @@ fn test_unfinished_editor_session_and_its_unconfirmed_push_survive_reopening_the
     let session = &unfinished[0];
     assert_eq!(session.id, unfinished_id);
     assert_eq!(session.working_copy_id, working_copy_id);
+    assert_eq!(session.editor_identity.as_deref(), Some("identity-hash"));
     assert!(session.last_recorded_at.is_some());
     assert_eq!(session.ended_at, None);
-    let push = session
-        .unconfirmed_push
-        .as_ref()
-        .expect("The unconfirmed push should survive");
+    let versions = service
+        .read_working_copy_versions(working_copy_id)
+        .expect("Read should succeed");
     assert_eq!(
-        (push.remote_post, push.body.as_str()),
-        (None, r#"{"title":"Draft"}"#)
+        versions
+            .last()
+            .and_then(|version| version.editor_session_id.clone()),
+        Some(unfinished_id.clone())
+    );
+    let requests = service
+        .read_editor_session_requests(unfinished_id)
+        .expect("Read should succeed");
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].outcome, None,
+        "The save's outcome was never recorded"
     );
 }

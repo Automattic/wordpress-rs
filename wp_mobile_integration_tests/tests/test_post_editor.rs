@@ -1,8 +1,11 @@
-//! Saving posts from an editor through `PostEditorService`, against the test
-//! server.
+//! Recording what an editor does through `PostEditorService`, and pushing
+//! after it closes, against the test server.
 
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, sync::Arc};
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 use tempfile::TempDir;
 use wp_api::{
     api_client::{IsWpApiClientDelegate, WpApiRequestBuilder},
@@ -13,12 +16,13 @@ use wp_api::{
 };
 use wp_mobile::service::{
     local_content::LocalContentService,
-    post_editor::{EditorRequest, PostEditorService},
+    post_editor::{PostEditorService, PostEditorSession},
 };
 use wp_mobile_integration_tests::*;
 use wp_mobile_local_content::{
     WpLocalContentStore,
     db_types::{
+        editor_session::{EditorRequest, EditorResponse},
         working_copy::{PostWorkingCopyFields, PublishDate},
         working_copy_remote_target::SiteIdentity,
     },
@@ -159,9 +163,77 @@ async fn test_update_response_holds_the_whole_post_in_the_edit_context() {
     RestoreServer::db().await;
 }
 
+/// Send a request the way the editor does, with the test site's
+/// credentials, and report it to `session` as the editor would: before it's
+/// sent, and with its response. Returns the response's JSON body.
+async fn editor_sends(
+    api: &WpApiClient,
+    session: &PostEditorSession,
+    request_id: &str,
+    post_id: Option<PostId>,
+    body: Value,
+) -> (u32, Value) {
+    let segments = std::iter::once("posts".to_string())
+        .chain(post_id.map(|post_id| post_id.0.to_string()))
+        .collect::<Vec<_>>();
+    let path = format!("/wp/v2/{}", segments.join("/"));
+    let url = test_site_api_url_resolver()
+        .resolve("wp/v2".to_string(), segments)
+        .inner
+        .clone();
+    let auth_provider = api.posts().get_delegate().auth_provider.clone();
+    let body = body
+        .as_object()
+        .cloned()
+        .expect("The body is a JSON object");
+    let request = InnerRequestBuilder::new(auth_provider).post(url.into(), Some(&body));
+
+    session
+        .record_request_sent(EditorRequest {
+            request_id: request_id.to_string(),
+            method: "POST".to_string(),
+            path,
+            headers: HashMap::new(),
+            body: Some(serde_json::to_vec(&body).expect("JSON serializes")),
+        })
+        .await
+        .expect("Recording the request should succeed");
+    let response = api
+        .posts()
+        .perform(Arc::new(request), None)
+        .await
+        .expect("The request should get an answer");
+    let status_code = response.status_code;
+    let json = json_body(&response.body);
+    session
+        .record_request_response(
+            request_id.to_string(),
+            EditorResponse {
+                status_code,
+                headers: HashMap::new(),
+                body: response.body,
+            },
+        )
+        .await
+        .expect("Recording the response should succeed");
+    (status_code, json)
+}
+
+async fn fetch_post(api: &WpApiClient, post_id: PostId) -> wp_api::posts::AnyPostWithEditContext {
+    api.posts()
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &post_id,
+            &PostRetrieveParams::default(),
+        )
+        .await
+        .expect("Fetching the post should succeed")
+        .data
+}
+
 #[tokio::test]
 #[serial]
-async fn test_editor_save_pushes_the_working_copy_and_records_the_push() {
+async fn test_editor_save_is_recorded_and_its_response_becomes_the_base_version() {
     let ctx = create_test_context();
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let local_content = open_local_content(&dir);
@@ -171,48 +243,29 @@ async fn test_editor_save_pushes_the_working_copy_and_records_the_push() {
         local_content.clone(),
         site(),
     ));
-
     let session = service
         .clone()
-        .open_post(post_id)
+        .open_post(post_id, None)
         .await
         .expect("Opening the post should succeed");
-    let response = session
-        .perform_editor_request(EditorRequest {
-            method: "PUT".to_string(),
-            path: format!("/wp/v2/posts/{}?_locale=user", post_id.0),
-            body: Some(
-                serde_json::to_vec(&json!({ "id": post_id.0, "title": "Saved from the editor" }))
-                    .expect("JSON serializes"),
-            ),
-        })
-        .await
-        .expect("The save should get an answer");
 
-    assert_eq!(response.status_code, 200);
-    let saved = json_body(&response.body);
+    let (status_code, saved) = editor_sends(
+        &ctx.api,
+        &session,
+        "save",
+        Some(post_id),
+        json!({ "title": "Saved from the editor" }),
+    )
+    .await;
+
+    assert_eq!(status_code, 200);
     assert_eq!(saved["title"]["raw"], json!("Saved from the editor"));
-    // Only what changed was sent, so the rest stays as it was.
-    assert_eq!(saved["excerpt"]["raw"], json!("An excerpt"));
-    let on_server = ctx
-        .api
-        .posts()
-        .retrieve_with_edit_context(
-            &PostEndpointType::Posts,
-            &post_id,
-            &PostRetrieveParams::default(),
-        )
-        .await
-        .expect("Fetching the post should succeed")
-        .data;
-    assert_eq!(
-        on_server.title.and_then(|title| title.raw),
-        Some("Saved from the editor".to_string())
-    );
+    let on_server = fetch_post(&ctx.api, post_id).await;
     let working_copy = local_content
         .read_post_working_copy(session.working_copy_id())
         .expect("Read should succeed")
         .expect("The working copy exists");
+    assert_eq!(working_copy.fields.common.title, "Saved from the editor");
     assert_eq!(
         working_copy
             .remote_target
@@ -220,6 +273,9 @@ async fn test_editor_save_pushes_the_working_copy_and_records_the_push() {
             .map(|remote| remote.base_modified_gmt),
         Some(on_server.modified_gmt)
     );
+    let requests = session.requests().expect("Reading should succeed");
+    assert_eq!(requests.len(), 1);
+    assert!(requests[0].outcome.is_some());
     session.end().expect("Ending the session should succeed");
 
     RestoreServer::db().await;
@@ -227,19 +283,17 @@ async fn test_editor_save_pushes_the_working_copy_and_records_the_push() {
 
 #[tokio::test]
 #[serial]
-async fn test_new_post_is_created_on_its_first_push() {
+async fn test_new_post_the_editor_creates_becomes_the_working_copy_remote_post() {
     let ctx = create_test_context();
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let local_content = open_local_content(&dir);
     let service = Arc::new(PostEditorService::new(
         Arc::new(ctx.service),
-        local_content,
+        open_local_content(&dir),
         site(),
     ));
-
     let session = service
         .clone()
-        .open_new_post()
+        .open_new_post(None)
         .expect("Opening a new post should succeed");
     session
         .record_change(
@@ -251,44 +305,42 @@ async fn test_new_post_is_created_on_its_first_push() {
             }))
             .expect("JSON serializes"),
         )
-        .expect("Recording should succeed");
-    let response = session.push().await.expect("The push should get an answer");
-
-    assert_eq!(response.status_code, 201);
-    let post_id = session
-        .remote_post_id()
-        .expect("Read should succeed")
-        .expect("The push created the post");
-    let on_server = ctx
-        .api
-        .posts()
-        .retrieve_with_edit_context(
-            &PostEndpointType::Posts,
-            &post_id,
-            &PostRetrieveParams::default(),
-        )
         .await
-        .expect("Fetching the post should succeed")
-        .data;
-    assert_eq!(on_server.status, PostStatus::Draft);
+        .expect("Recording should succeed");
+
+    let (status_code, created) = editor_sends(
+        &ctx.api,
+        &session,
+        "create",
+        None,
+        json!({
+            "title": "Written on the device",
+            "content": "<!-- wp:paragraph --><p>New</p><!-- /wp:paragraph -->",
+            "status": "draft",
+        }),
+    )
+    .await;
+
+    assert_eq!(status_code, 201);
+    let post_id = PostId(created["id"].as_i64().expect("The response has an ID"));
     assert_eq!(
-        on_server.title.and_then(|title| title.raw),
-        Some("Written on the device".to_string())
+        session.remote_post_id().expect("Read should succeed"),
+        Some(post_id)
     );
-    let saved_post = json_body(
-        &session
+    assert_eq!(
+        session
             .editor_post()
             .expect("Reading should succeed")
-            .saved_post
-            .expect("The post is on the server now"),
+            .post_id,
+        Some(post_id)
     );
-    assert_eq!(saved_post["id"], json!(post_id.0));
 
     RestoreServer::db().await;
 }
 
 /// The working copy keeps the editor's `date` in the site's timezone, and a
-/// push sends it as it is. `null` makes the date float again.
+/// push after the editor closes sends it as it is. `null` makes the date float
+/// again.
 #[tokio::test]
 #[serial]
 async fn test_editor_date_is_pushed_in_the_site_timezone_and_null_floats_it() {
@@ -302,34 +354,39 @@ async fn test_editor_date_is_pushed_in_the_site_timezone_and_null_floats_it() {
     ));
     let session = service
         .clone()
-        .open_post(post_id)
+        .open_post(post_id, None)
         .await
         .expect("Opening the post should succeed");
-    let save = |date: Value| EditorRequest {
-        method: "PUT".to_string(),
-        path: format!("/wp/v2/posts/{}", post_id.0),
-        body: Some(serde_json::to_vec(&json!({ "date": date })).expect("JSON serializes")),
+    let change_date_and_push = |date: Value| {
+        let service = service.clone();
+        let session = session.clone();
+        async move {
+            session
+                .record_change(
+                    serde_json::to_vec(&json!({ "date": date })).expect("JSON serializes"),
+                )
+                .await
+                .expect("Recording should succeed");
+            json_body(
+                &service
+                    .push_working_copy(session.working_copy_id())
+                    .await
+                    .expect("The push should get an answer")
+                    .body,
+            )
+        }
     };
 
-    let dated = json_body(
-        &session
-            .perform_editor_request(save(json!("2030-01-15T10:30:00")))
-            .await
-            .expect("The save should get an answer")
-            .body,
-    );
+    let dated = change_date_and_push(json!("2030-01-15T10:30:00")).await;
     assert_eq!(dated["date"], json!("2030-01-15T10:30:00"));
     assert_ne!(
         dated["date_gmt"], dated["date"],
         "The test site's timezone isn't UTC, so the server converts the date"
     );
 
-    let floating = session
-        .perform_editor_request(save(Value::Null))
-        .await
-        .expect("The save should get an answer");
     let floating: wp_api::posts::AnyPostWithEditContext =
-        serde_json::from_slice(&floating.body).expect("The response is a post");
+        serde_json::from_value(change_date_and_push(Value::Null).await)
+            .expect("The response is a post");
     assert_eq!(
         PostWorkingCopyFields::from_remote(&floating)
             .expect("Conversion should succeed")
@@ -359,7 +416,7 @@ async fn test_push_matching_the_server_is_not_a_conflict() {
     ));
     let session = service
         .clone()
-        .open_post(post_id)
+        .open_post(post_id, None)
         .await
         .expect("Opening the post should succeed");
 
@@ -388,7 +445,10 @@ async fn test_push_matching_the_server_is_not_a_conflict() {
         .save_post_working_copy(working_copy.id, fields)
         .expect("Saving should succeed");
 
-    let response = session.push().await.expect("The push should succeed");
+    let response = service
+        .push_working_copy(session.working_copy_id())
+        .await
+        .expect("The push should succeed");
 
     assert_eq!(response.status_code, 200);
     let base = local_content

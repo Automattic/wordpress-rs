@@ -60,17 +60,19 @@ public typealias PostMeta = WordPressAPIInternal.PostMeta
 public typealias WpDateString = WordPressAPIInternal.WpDateString
 public typealias EditorSessionId = WordPressAPIInternal.EditorSessionId
 public typealias EditorSession = WordPressAPIInternal.EditorSession
-public typealias UnconfirmedPush = WordPressAPIInternal.UnconfirmedPush
-public typealias BaseMismatch = WordPressAPIInternal.BaseMismatch
+public typealias EditorRequest = WordPressAPIInternal.EditorRequest
+public typealias EditorResponse = WordPressAPIInternal.EditorResponse
+public typealias EditorRequestRecord = WordPressAPIInternal.EditorRequestRecord
+public typealias EditorRequestOutcome = WordPressAPIInternal.EditorRequestOutcome
+public typealias WorkingCopyVersionId = WordPressAPIInternal.WorkingCopyVersionId
+public typealias WorkingCopyVersion = WordPressAPIInternal.WorkingCopyVersion
 
 // MARK: - Post Editor
 public typealias PostEditorService = WordPressAPIInternal.PostEditorService
 public typealias PostEditorSession = WordPressAPIInternal.PostEditorSession
 public typealias PostEditorError = WordPressAPIInternal.PostEditorError
-public typealias EditorRequest = WordPressAPIInternal.EditorRequest
 public typealias ServerResponse = WordPressAPIInternal.ServerResponse
 public typealias EditorPost = WordPressAPIInternal.EditorPost
-public typealias SavedPostCheck = WordPressAPIInternal.SavedPostCheck
 
 // MARK: - Login
 

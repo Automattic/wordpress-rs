@@ -3,12 +3,15 @@ use wp_api::posts::PostId;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
-        editor_session::{EditorSession, EditorSessionId},
+        editor_session::{
+            EditorRequest, EditorRequestRecord, EditorResponse, EditorSession, EditorSessionId,
+        },
         working_copy::{
             PageWorkingCopy, PageWorkingCopyFields, PostWorkingCopy, PostWorkingCopyFields,
             WorkingCopyId,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
+        working_copy_version::{WorkingCopyVersion, WorkingCopyVersionId},
     },
     repository::{editor_sessions::EditorSessionRepository, working_copies::WorkingCopyRepository},
 };
@@ -18,8 +21,10 @@ use wp_mobile_local_content::{
 ///
 /// A working copy is the user's version of a post or page. It holds `fields`,
 /// the post as the user edits it, and a `remote_target`, the site and post
-/// that pushing it updates. A working copy is deleted only when you call one
-/// of the delete functions, so call them only when the user asks.
+/// that pushing it updates. Each save that changes its fields adds a version
+/// to its history, and its `fields` are the newest version's. A working copy
+/// is deleted only when you call one of the delete functions, so call them
+/// only when the user asks.
 ///
 /// The service never talks to the server or the API cache. Your app pushes a
 /// working copy by sending its fields to the server itself, then records the
@@ -78,8 +83,9 @@ impl LocalContentService {
         })
     }
 
-    /// Save the user's changes to a post working copy, replacing all of its
-    /// fields with `fields`.
+    /// Save the user's changes to a post working copy: `fields` become its
+    /// fields, as a new version in its history. Nothing is added if they're
+    /// the fields it has.
     ///
     /// Fails with `WorkingCopyNotFound` if no post working copy has the ID.
     pub fn save_post_working_copy(
@@ -89,7 +95,7 @@ impl LocalContentService {
     ) -> Result<(), LocalContentError> {
         let updated = self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            let updated = WorkingCopyRepository.update_post(&transaction, &id, &fields)?;
+            let updated = WorkingCopyRepository.update_post(&transaction, &id, &fields, None)?;
             transaction.commit()?;
             Ok::<_, LocalContentError>(updated)
         })?;
@@ -226,8 +232,9 @@ impl LocalContentService {
         })
     }
 
-    /// Save the user's changes to a page working copy, replacing all of its
-    /// fields with `fields`.
+    /// Save the user's changes to a page working copy: `fields` become its
+    /// fields, as a new version in its history. Nothing is added if they're
+    /// the fields it has.
     ///
     /// Fails with `WorkingCopyNotFound` if no page working copy has the ID.
     pub fn save_page_working_copy(
@@ -237,7 +244,7 @@ impl LocalContentService {
     ) -> Result<(), LocalContentError> {
         let updated = self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            let updated = WorkingCopyRepository.update_page(&transaction, &id, &fields)?;
+            let updated = WorkingCopyRepository.update_page(&transaction, &id, &fields, None)?;
             transaction.commit()?;
             Ok::<_, LocalContentError>(updated)
         })?;
@@ -320,32 +327,61 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_all_pages(conn))
     }
 
+    /// Read the history of a post or page working copy: its versions, oldest
+    /// first. The newest holds the working copy's fields.
+    ///
+    /// Fails with `WorkingCopyNotFound` if no working copy has the ID.
+    pub fn read_working_copy_versions(
+        &self,
+        id: WorkingCopyId,
+    ) -> Result<Vec<WorkingCopyVersion>, LocalContentError> {
+        self.store
+            .execute(|conn| WorkingCopyRepository.select_versions(conn, &id))?
+            .ok_or(LocalContentError::WorkingCopyNotFound { id })
+    }
+
+    /// Read the fields of one version of a post working copy, or `None` if no
+    /// version of a post working copy has the ID.
+    pub fn read_post_working_copy_version(
+        &self,
+        id: WorkingCopyVersionId,
+    ) -> Result<Option<PostWorkingCopyFields>, LocalContentError> {
+        self.store
+            .execute(|conn| WorkingCopyRepository.select_post_version(conn, &id))
+    }
+
+    /// Read the fields of one version of a page working copy, or `None` if no
+    /// version of a page working copy has the ID.
+    pub fn read_page_working_copy_version(
+        &self,
+        id: WorkingCopyVersionId,
+    ) -> Result<Option<PageWorkingCopyFields>, LocalContentError> {
+        self.store
+            .execute(|conn| WorkingCopyRepository.select_page_version(conn, &id))
+    }
+
     /// Start an editor session for a working copy, and return it.
+    ///
+    /// `editor_identity` is who the editor makes its requests as, in a form
+    /// that isn't a credential, such as a hash of the token. It's recorded as
+    /// given.
     ///
     /// Fails with `WorkingCopyNotFound` if no working copy has the ID.
     pub fn create_editor_session(
         &self,
         working_copy_id: WorkingCopyId,
+        editor_identity: Option<String>,
     ) -> Result<EditorSession, LocalContentError> {
         self.store.execute(|conn| {
-            let id = EditorSessionRepository.insert(conn, &working_copy_id)?;
+            let id = EditorSessionRepository.insert(
+                conn,
+                &working_copy_id,
+                editor_identity.as_deref(),
+            )?;
             EditorSessionRepository
                 .select(conn, &id)?
                 .ok_or(LocalContentError::EditorSessionNotFound { id })
         })
-    }
-
-    /// Record that a change was just recorded in the session's working copy.
-    ///
-    /// Fails with `EditorSessionNotFound` if no session has the ID.
-    pub fn record_editor_session_change(
-        &self,
-        id: EditorSessionId,
-    ) -> Result<(), LocalContentError> {
-        let recorded = self
-            .store
-            .execute(|conn| EditorSessionRepository.record_change(conn, &id))?;
-        found_session(recorded, id)
     }
 
     /// End a session: when its editor closes, or once a session that didn't
@@ -367,6 +403,16 @@ impl LocalContentService {
         self.store
             .execute(|conn| EditorSessionRepository.select_unfinished(conn))
     }
+
+    /// Read the requests the editor reported during a session, in the order
+    /// it reported sending them.
+    pub fn read_editor_session_requests(
+        &self,
+        id: EditorSessionId,
+    ) -> Result<Vec<EditorRequestRecord>, LocalContentError> {
+        self.store
+            .execute(|conn| EditorSessionRepository.select_requests(conn, &id))
+    }
 }
 
 impl LocalContentService {
@@ -379,43 +425,86 @@ impl LocalContentService {
             .execute(|conn| EditorSessionRepository.select(conn, id))
     }
 
-    /// Record a push that is about to be sent, so it's known after the app
-    /// ends if no answer arrives. It replaces the session's previous
-    /// unconfirmed push.
+    /// Record a change the editor made in a session: `fields` become the post
+    /// working copy's fields, as a version recorded in the session, and the
+    /// session's `last_recorded_at` becomes now.
     ///
-    /// `remote_post` is the post the push updates, with its base version, or
-    /// `None` if the push creates the post. `body` is the JSON object it sends.
-    pub fn record_unconfirmed_push(
+    /// Fails with `WorkingCopyNotFound` if no post working copy has
+    /// `working_copy_id`, and with `EditorSessionNotFound` if no session has
+    /// `session_id`.
+    pub fn record_post_working_copy_change_in_session(
         &self,
-        id: &EditorSessionId,
-        remote_post: Option<RemotePostReference>,
-        body: &str,
+        session_id: &EditorSessionId,
+        working_copy_id: &WorkingCopyId,
+        fields: &PostWorkingCopyFields,
     ) -> Result<(), LocalContentError> {
-        let recorded = self.store.execute(|conn| {
-            EditorSessionRepository.record_unconfirmed_push(conn, id, remote_post, body)
-        })?;
-        found_session(recorded, id.clone())
+        self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            if !WorkingCopyRepository.update_post(
+                &transaction,
+                working_copy_id,
+                fields,
+                Some(session_id),
+            )? {
+                return Err(LocalContentError::WorkingCopyNotFound {
+                    id: working_copy_id.clone(),
+                });
+            }
+            found_session(
+                EditorSessionRepository.record_change(&transaction, session_id)?,
+                session_id.clone(),
+            )?;
+            transaction.commit()?;
+            Ok(())
+        })
     }
 
-    /// Delete the session's unconfirmed push, once it's known whether it landed.
-    pub fn clear_unconfirmed_push(&self, id: &EditorSessionId) -> Result<(), LocalContentError> {
-        let cleared = self
-            .store
-            .execute(|conn| EditorSessionRepository.clear_unconfirmed_push(conn, id))?;
-        found_session(cleared, id.clone())
-    }
-
-    /// Record that the editor's version of the post differed from the
-    /// server's in `fields`, replacing the mismatch the session had.
-    pub fn record_base_mismatch(
+    /// Record that the editor sent `request` during a session.
+    pub fn record_editor_request_sent(
         &self,
         id: &EditorSessionId,
-        fields: &[String],
+        request: &EditorRequest,
     ) -> Result<(), LocalContentError> {
-        let recorded = self
-            .store
-            .execute(|conn| EditorSessionRepository.record_base_mismatch(conn, id, fields))?;
-        found_session(recorded, id.clone())
+        self.store
+            .execute(|conn| EditorSessionRepository.record_request_sent(conn, id, request))
+    }
+
+    /// Record the response to a request the session recorded as sent, and
+    /// return the completed record.
+    pub fn record_editor_request_response(
+        &self,
+        id: &EditorSessionId,
+        request_id: &str,
+        response: &EditorResponse,
+    ) -> Result<EditorRequestRecord, LocalContentError> {
+        self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            EditorSessionRepository.record_request_response(
+                &transaction,
+                id,
+                request_id,
+                response,
+            )?;
+            let record = EditorSessionRepository
+                .select_request(&transaction, id, request_id)?
+                .ok_or_else(|| LocalContentError::EditorRequestNotFound {
+                    request_id: request_id.to_string(),
+                })?;
+            transaction.commit()?;
+            Ok(record)
+        })
+    }
+
+    /// Record that a request the session recorded as sent got no answer.
+    pub fn record_editor_request_failure(
+        &self,
+        id: &EditorSessionId,
+        request_id: &str,
+        reason: &str,
+    ) -> Result<(), LocalContentError> {
+        self.store.execute(|conn| {
+            EditorSessionRepository.record_request_failure(conn, id, request_id, reason)
+        })
     }
 }
 
