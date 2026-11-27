@@ -21,10 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** The tests of how TLS failures are reported use a copy of badssl.com that CI runs on each machine (`scripts/badssl-server.sh`), instead of the live site, which sometimes drops connections. They skip unless `BADSSL_DOMAIN` is set.
 - **Internal:** Mac CI runs on the `xcode-27.2-v4` image, which stops the SSH connection drops shortly after boot seen on `xcode-27.2-v3`.
 - **Internal:** Two integration tests pass on WordPress 7.2 as well as 6.8.1. The comment test for a missing author accepts the permission error that 7.2 returns first, and the `show_on_front` settings test uses `page`, since WordPress 7.1.5 and later store any other value as `posts`.
+- **Internal:** Moved the browser-style link resolution that `site_icons` uses (relative addresses, `<base href>`, `http`/`https` only) into a shared `html_links` module, so other code that reads links from a page can use it.
 
 ### Fixed
 
 - The Kotlin `WpRequestExecutor` no longer makes `WpApiClient.request` throw an `InternalException` for a header value with non-ASCII characters. It now sends the value as UTF-8, as reqwest does.
+- `site_icons` and `preferred_site_icon` now treat whitespace in an icon address the way a browser does: only ASCII whitespace is stripped from the ends, so an address starting with a no-break space is no longer read as root-relative. An HTML icon link inside an SVG `<foreignObject>` is no longer skipped when an SVG element named `template` contains it.
 
 ### Fixed
 
