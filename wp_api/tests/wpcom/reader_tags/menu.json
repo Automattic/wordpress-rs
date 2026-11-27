@@ -1,0 +1,79 @@
+{
+  "default": {
+    "following": {
+      "title": "Followed Sites",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/following"
+    },
+    "discover": {
+      "title": "Discover",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/sites/53424024/posts"
+    },
+    "liked": {
+      "title": "My Likes",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/liked"
+    },
+    "a8c": {
+      "title": "Automattic",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/a8c",
+      "type": "organization",
+      "slug": "a8c",
+      "organization_id": 1
+    },
+    "p2": {
+      "title": "Followed P2s",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/following/p2",
+      "type": "organization",
+      "slug": "p2",
+      "organization_id": 2
+    },
+    "list-example-list": {
+      "title": "Example List",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/list/exampleuser/example-list/posts/",
+      "type": "list"
+    }
+  },
+  "subscribed": {
+    "9002": {
+      "ID": "9002",
+      "title": "Example Tag",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/example-tag/posts",
+      "slug": "example-tag",
+      "display_name": "example-tag",
+      "type": "tag"
+    },
+    "9001": {
+      "ID": "9001",
+      "title": "another tag",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/another-tag/posts",
+      "slug": "another-tag",
+      "display_name": "another-tag",
+      "type": "tag"
+    }
+  },
+  "recommended": {
+    "2806": {
+      "ID": 2806,
+      "title": "Art &amp; Design",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/art-design/posts",
+      "slug": "art-design",
+      "display_name": "art-design",
+      "type": "tag"
+    },
+    "178": {
+      "ID": 178,
+      "title": "Books",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/books/posts",
+      "slug": "books",
+      "display_name": "books",
+      "type": "tag"
+    },
+    "436": {
+      "ID": 436,
+      "title": "Photography",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/photography/posts",
+      "slug": "photography",
+      "display_name": "photography",
+      "type": "tag"
+    }
+  }
+}

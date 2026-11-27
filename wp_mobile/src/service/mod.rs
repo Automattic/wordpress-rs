@@ -3,7 +3,7 @@ use crate::service::{
     media::MediaService, post_types::PostTypeService, posts::PostService, sites::SiteService,
 };
 use std::sync::Arc;
-use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
+use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate, WpApiError, WpErrorCode};
 use wp_api::request::RequestExecutor;
 use wp_mobile_cache::{WpApiCache, db_types::db_site::DbSite};
 
@@ -13,6 +13,7 @@ pub mod metadata;
 pub mod mock_post_service;
 pub mod post_types;
 pub mod posts;
+pub mod reader;
 pub mod reader_saved;
 pub mod sites;
 
@@ -26,6 +27,20 @@ pub enum WpServiceError {
 
     #[error("Site not found in cache")]
     SiteNotFound,
+}
+
+/// Whether the server rejected the account's token rather than the request, so the same request
+/// can work once the reader signs in again. WordPress.com answers a token it doesn't accept with
+/// 400 `invalid_token` on `rest/v1.x` and 401 `oauth2_invalid_token` on `wpcom/v2`.
+pub(in crate::service) fn is_sign_in_rejected(error: &WpApiError) -> bool {
+    const REJECTED_TOKEN: [&str; 2] = ["invalid_token", "oauth2_invalid_token"];
+    match error {
+        WpApiError::WpError {
+            error_code: WpErrorCode::CustomError(code),
+            ..
+        } if REJECTED_TOKEN.contains(&code.as_str()) => true,
+        error => error.status_code() == Some(401),
+    }
 }
 
 impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {

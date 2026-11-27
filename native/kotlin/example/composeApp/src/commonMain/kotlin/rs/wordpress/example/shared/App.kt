@@ -1,28 +1,26 @@
 package rs.wordpress.example.shared
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import org.koin.compose.getKoin
 import org.koin.compose.koinInject
+import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpComApiClient
 import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.example.shared.di.createWpApiClient
-import rs.wordpress.example.shared.di.createReaderSavedService
+import rs.wordpress.example.shared.di.accountReaderSession
 import rs.wordpress.example.shared.di.createWpComApiClient
 import rs.wordpress.example.shared.di.createWpService
+import rs.wordpress.example.shared.di.signedOutReaderSession
 import rs.wordpress.example.shared.ui.components.ErrorMessage
 import rs.wordpress.example.shared.ui.applicationpasswords.ApplicationPasswordListScreen
 import rs.wordpress.example.shared.ui.comments.CommentListScreen
@@ -37,6 +35,10 @@ import rs.wordpress.example.shared.ui.postcollection.PostCollectionScreen
 import rs.wordpress.example.shared.ui.posts.PostListByTypeScreen
 import rs.wordpress.example.shared.ui.postmetadatacollection.PostMetadataCollectionScreen
 import rs.wordpress.example.shared.ui.posttypes.PostTypesScreen
+import rs.wordpress.example.shared.ui.reader.READER_ROUTE
+import rs.wordpress.example.shared.ui.reader.ReaderDestination
+import rs.wordpress.example.shared.ui.reader.ReaderScreen
+import rs.wordpress.example.shared.ui.reader.rememberReaderHost
 import rs.wordpress.example.shared.ui.search.SearchScreen
 import rs.wordpress.example.shared.ui.settings.SiteSettingsScreen
 import rs.wordpress.example.shared.ui.site.SitePostType
@@ -51,7 +53,6 @@ import rs.wordpress.example.shared.ui.users.UserListScreen
 import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComBotConversationsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComMeScreen
-import rs.wordpress.example.shared.ui.wpcom.WpComReaderSavedPostsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSiteScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSupportConversationsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComUnifiedConversationScreen
@@ -60,7 +61,6 @@ import uniffi.wp_api.ConversationId
 import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.TermEndpointType
 import uniffi.wp_mobile.Account
-import uniffi.wp_mobile.ReaderSavedService
 import uniffi.wp_mobile.WpService
 
 @Composable
@@ -74,8 +74,12 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
     var currentAccount by remember { mutableStateOf<Account.SelfHostedSite?>(null) }
     var currentWpComClient by remember { mutableStateOf<WpComApiClient?>(null) }
     var currentWpComAccount by remember { mutableStateOf<Account.WpCom?>(null) }
-    // One per account, shared by every screen: each instance only knows its own writes.
-    var currentReaderSavedService by remember { mutableStateOf<ReaderSavedService?>(null) }
+    // The Reader that's open, the account's or the signed-out reader's, and its screens.
+    val readerHost = rememberReaderHost(navController)
+    val koin = getKoin()
+    val networkAvailability = remember(koin) {
+        koin.getOrNull<NetworkAvailabilityProvider>() ?: NetworkAvailabilityProvider { true }
+    }
     var currentApiClient by remember { mutableStateOf<WpApiClient?>(null) }
     var currentSiteViewModel by remember { mutableStateOf<SiteViewModel?>(null) }
     var currentPostType by remember { mutableStateOf<SitePostType?>(null) }
@@ -83,12 +87,15 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
     var currentUnifiedConversationId by remember { mutableStateOf<ConversationId?>(null) }
 
     MaterialTheme {
-        NavHost(navController, startDestination = "welcome") {
+        NavHost(navController, startDestination = "welcome", modifier = Modifier.testTagsForUiTests()) {
             composable("welcome") {
                 WelcomeScreen(
                     authenticationEnabled,
                     onLoginClicked = {
                         navController.navigate("login")
+                    },
+                    onReaderClicked = {
+                        readerHost.start(ReaderDestination.Home) { signedOutReaderSession(networkAvailability) }
                     },
                     onSiteClicked = { account ->
                         when (account) {
@@ -111,7 +118,6 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                                 } else {
                                     currentWpComClient = createWpComApiClient(account)
                                     currentWpComAccount = account
-                                    currentReaderSavedService = null
                                     navController.navigate("wpcom_site")
                                 }
                             }
@@ -388,12 +394,34 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 )
             }
             composable("wpcom_site") {
+                val account = currentWpComAccount
+                val wpComClient = currentWpComClient
+                if (account == null || wpComClient == null) {
+                    ErrorMessage("No WordPress.com account connected")
+                    return@composable
+                }
+                // The account's Reader, opened at one of its screens.
+                val openReader = { destination: ReaderDestination ->
+                    readerHost.start(destination) {
+                        accountReaderSession(account, wpComClient, networkAvailability)
+                    }
+                }
                 WpComSiteScreen(
                     onMeClicked = { navController.navigate("wpcom_me") },
                     onSupportConversationsClicked = { navController.navigate("wpcom_support") },
                     onUnifiedConversationsClicked = { navController.navigate("wpcom_unified") },
                     onBotConversationsClicked = { navController.navigate("wpcom_bots") },
-                    onReaderSavedPostsClicked = { navController.navigate("wpcom_reader_saved") },
+                    onReaderClicked = { openReader(ReaderDestination.Home) },
+                    onReaderSavedPostsClicked = { openReader(ReaderDestination.SavedPosts) },
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable(READER_ROUTE) { entry ->
+                ReaderScreen(
+                    session = readerHost.session,
+                    error = readerHost.error,
+                    destination = remember(entry.id) { readerHost.destinationOf(entry.id) },
+                    open = readerHost::open,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
@@ -429,39 +457,6 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                     wpComApiClient = wpComClient,
                     onBackClicked = { navController.popBackStack() }
                 )
-            }
-            composable("wpcom_reader_saved") {
-                val account = currentWpComAccount
-                val wpComClient = currentWpComClient
-                if (account == null || wpComClient == null) {
-                    ErrorMessage("No WordPress.com account connected")
-                    return@composable
-                }
-                var loadError by remember { mutableStateOf<String?>(null) }
-                LaunchedEffect(account) {
-                    if (currentReaderSavedService == null) {
-                        try {
-                            currentReaderSavedService =
-                                createReaderSavedService(account, wpComClient)
-                        } catch (e: Exception) {
-                            loadError = e.toString()
-                        }
-                    }
-                }
-                val readerSavedService = currentReaderSavedService
-                when {
-                    loadError != null -> ErrorMessage(loadError!!)
-                    readerSavedService == null -> Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                    else -> WpComReaderSavedPostsScreen(
-                        readerSavedService = readerSavedService,
-                        onBackClicked = { navController.popBackStack() }
-                    )
-                }
             }
             composable("wpcom_unified") {
                 val wpComClient = currentWpComClient

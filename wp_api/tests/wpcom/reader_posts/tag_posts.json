@@ -1,0 +1,122 @@
+{
+  "success": true,
+  "tags": [
+    "photography"
+  ],
+  "sort": "date",
+  "lang": "en",
+  "page": 1,
+  "next_page_handle": "ZnJvbT0yJmJlZm9yZT0yMDI2LTExLTE3VDE5JTNBMzklM0ExNC0wNSUzQTAw",
+  "date_range": {
+    "before": "2026-11-18T01:00:00+00:00",
+    "after": "2026-11-17T19:39:14-05:00"
+  },
+  "posts": [
+    {
+      "ID": 1001,
+      "site_ID": 2001,
+      "feed_ID": 3001,
+      "is_external": false,
+      "date": "2026-11-18T01:00:00+00:00",
+      "modified": "2026-11-08T16:39:34+00:00",
+      "title": "Example post 1",
+      "URL": "https://example1.wordpress.com/2026/11/17/example-post/",
+      "short_URL": "https://wp.me/pEXAMPLE-1",
+      "excerpt": "<p>An example excerpt.</p>\n",
+      "content": "<p>Example content.</p>\n",
+      "author": {
+        "ID": 5001,
+        "login": "example1",
+        "email": false,
+        "name": "Example Author",
+        "first_name": "Example",
+        "last_name": "Author",
+        "nice_name": "example1",
+        "URL": "https://example1.wordpress.com",
+        "avatar_URL": "https://example.com/avatar.png",
+        "profile_URL": "https://example.com/example1",
+        "site_ID": 2001
+      },
+      "site_name": "Example Site 1",
+      "site_URL": "https://example1.wordpress.com",
+      "featured_image": "",
+      "like_count": "0",
+      "i_like": false,
+      "is_following": false,
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": true,
+        "ping_status": "open",
+        "comment_count": 0,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "tags": {
+        "photography": {
+          "ID": 436,
+          "name": "photography",
+          "slug": "photography",
+          "description": "",
+          "post_count": 6,
+          "display_name": "photography"
+        }
+      },
+      "global_ID": "00000000000000000000000000000001",
+      "use_excerpt": false
+    },
+    {
+      "ID": 1002,
+      "site_ID": 2002,
+      "feed_ID": 3002,
+      "is_external": false,
+      "date": "2026-11-17T19:39:14-05:00",
+      "modified": "2026-11-17T19:43:25-05:00",
+      "title": "Example post 2",
+      "URL": "https://example2.wordpress.com/2026/11/17/example-post/",
+      "short_URL": "https://wp.me/pEXAMPLE-2",
+      "excerpt": "<p>An example excerpt.</p>\n",
+      "content": "<p>Example content.</p>\n",
+      "author": {
+        "ID": 5002,
+        "login": "example2",
+        "email": false,
+        "name": "Example Author",
+        "first_name": "Example",
+        "last_name": "Author",
+        "nice_name": "example2",
+        "URL": "https://example2.wordpress.com",
+        "avatar_URL": "https://example.com/avatar.png",
+        "profile_URL": "https://example.com/example2",
+        "site_ID": 2002
+      },
+      "site_name": "Example Site 2",
+      "site_URL": "https://example2.wordpress.com",
+      "featured_image": "",
+      "like_count": "0",
+      "i_like": false,
+      "is_following": false,
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": true,
+        "ping_status": "open",
+        "comment_count": 0,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "tags": {
+        "photography": {
+          "ID": 436,
+          "name": "photography",
+          "slug": "photography",
+          "description": "",
+          "post_count": 1,
+          "display_name": "photography"
+        }
+      },
+      "global_ID": "00000000000000000000000000000002",
+      "use_excerpt": false
+    }
+  ]
+}

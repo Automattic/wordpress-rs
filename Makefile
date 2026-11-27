@@ -225,7 +225,14 @@ test-swift-tvOS: xcframework
 test-swift-watchOS: xcframework
 	scripts/xcodebuild-test.sh watchOS-27-2
 
+# Builds in two steps to cap peak RAM. The wp_api library and wp_api's unit
+# tests are by far the heaviest compiles, and a plain `cargo test --lib` starts
+# them together (even at a low --jobs), which can exhaust CI's 16GB machines.
+# Building everything except wp_api's tests first keeps them apart; the second
+# step reuses that wp_api library. `cargo build -p wp_api` can't stand in for
+# the first step: it resolves different features, so everything rebuilds.
 test-rust-lib:
+	$(rust_docker_run) cargo test --lib --no-run --workspace --exclude wp_api
 	$(rust_docker_run) cargo test --lib -- --nocapture
 
 test-rust-doc:

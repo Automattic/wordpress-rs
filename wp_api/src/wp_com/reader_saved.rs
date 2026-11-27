@@ -1,17 +1,21 @@
 use crate::{
     date::WpGmtDateTime,
+    impl_as_query_value_from_to_string,
     posts::PostId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    wp_com::{WpComSiteId, reader_posts::ReaderPost},
+    wp_com::{
+        WpComSiteId,
+        reader_posts::{ReaderPost, ReaderStreamOrder, ReaderUnreadablePost, sort_posts},
+    },
     wp_content_u64_id,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
-    deserialize_null_as_empty_vec, deserialize_u64_or_string, deserialize_u64_or_string_or_none,
+    LenientVec, deserialize_u64_or_string, deserialize_u64_or_string_or_none,
     deserialize_u64_or_string_or_none_as_t,
 };
 
@@ -163,6 +167,7 @@ pub enum ReaderSavedSource {
 pub struct ReaderSavePostParams {
     #[serde(flatten)]
     pub key: ReaderSavedKey,
+    /// The app making the save, which is recorded with it.
     pub source: ReaderSavedSource,
     /// What to show for a page saved by URL, which the server doesn't fetch. Kept only when the URL
     /// isn't a WordPress.com post.
@@ -202,6 +207,7 @@ pub struct ReaderSavedPageDetails {
 pub struct ReaderUnsavePostParams {
     #[serde(flatten)]
     pub key: ReaderSavedKey,
+    /// The app removing the save.
     pub source: ReaderSavedSource,
 }
 
@@ -248,6 +254,7 @@ pub struct ReaderSavedBulkParams {
     /// The keys to save, newest first: between 1 and 100, or the whole request is rejected. If they
     /// would take the user past the 1,000 save cap, the newest are the ones saved.
     pub keys: Vec<ReaderSavedBulkKey>,
+    /// The app making the saves, which is recorded with each.
     pub source: ReaderSavedSource,
 }
 
@@ -327,20 +334,81 @@ pub struct ReaderSavedPostsParams {
     /// [`ReaderPost::site_icon_url`] that has one: `feed` adds an RSS feed's image.
     #[uniffi(default = None)]
     pub meta: Option<String>,
+    /// What the list is ordered by: when each post was saved, unless this says otherwise. Send
+    /// the same value with a [`Self::page_handle`] as the request that returned it.
+    #[uniffi(default = None)]
+    #[field_name("orderBy")]
+    pub order_by: Option<ReaderSavedOrderBy>,
+    /// The order of the list: newest first, unless this says otherwise. Send the same value with
+    /// a [`Self::page_handle`] as the request that returned it. The API reads it only in capitals,
+    /// `ASC` and `DESC`, which is how it's sent: it takes `asc` for the default.
+    #[uniffi(default = None)]
+    pub order: Option<ReaderStreamOrder>,
 }
 
-/// Response from `GET /rest/v1.2/read/saved`, newest save first.
+/// What the saved list is ordered by.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ReaderSavedOrderBy {
+    /// When each post was saved. The API's default.
+    Date,
+    /// When each post was published.
+    DatePublished,
+}
+
+impl_as_query_value_from_to_string!(ReaderSavedOrderBy);
+
+/// Response from `GET /rest/v1.2/read/saved`, newest save first unless the request asked for
+/// another order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderSavedPostsResponse")]
 pub struct ReaderSavedPostsResponse {
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
+    /// The page's posts, without any in [`Self::unreadable_posts`].
     pub posts: Vec<ReaderSavedPost>,
+    /// The posts on the page that couldn't be read. Almost always empty. Each is still saved: a
+    /// post that can't be read is not an unsaved one.
+    #[uniffi(default = [])]
+    pub unreadable_posts: Vec<ReaderUnreadablePost>,
     /// The handle of the next page. Only a missing handle means the end of the list: posts that
     /// can't be shown are skipped, so a page can be short, or even empty, with more to come.
-    #[serde(default)]
     pub next_page_handle: Option<String>,
     /// How many posts the user has saved.
-    #[serde(default)]
     pub found: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderSavedPostsResponse {
+    #[serde(default)]
+    posts: Option<LenientVec<ReaderSavedPost>>,
+    #[serde(default)]
+    next_page_handle: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
+    found: Option<u64>,
+}
+
+impl From<RawReaderSavedPostsResponse> for ReaderSavedPostsResponse {
+    fn from(raw: RawReaderSavedPostsResponse) -> Self {
+        let (posts, unreadable_posts) = sort_posts(raw.posts);
+        Self {
+            posts,
+            unreadable_posts,
+            next_page_handle: raw.next_page_handle,
+            found: raw.found,
+        }
+    }
 }
 
 /// The fields of a Reader post that decide which key it's saved under.
@@ -393,12 +461,36 @@ impl ReaderPostSaveIdentity {
     fn nonzero_feed_item_id(&self) -> Option<ReaderFeedItemId> {
         self.feed_item_id.filter(|id| id.0 != 0)
     }
+
+    /// Whether the post is a feed item rather than a post of a WordPress.com or Jetpack site: one
+    /// the API says is external, or one with no post ID (`0`) and a feed item ID. The API sends the
+    /// second kind for a feed whose site it no longer serves, with `is_external: false` and the
+    /// site's ID. Such a post is read, marked as seen and saved by its feed item, and can't be
+    /// liked or have its comments followed.
+    pub fn is_feed_item(&self) -> bool {
+        self.is_external || (self.id == 0 && self.nonzero_feed_item_id().is_some())
+    }
+
+    /// The post's site and its ID on that site, or `None` for a feed item or a post missing either
+    /// ID. What a like, a page view or a comment subscription is sent with.
+    pub fn site_post(&self) -> Option<(WpComSiteId, PostId)> {
+        if self.is_feed_item() {
+            return None;
+        }
+        let site_id = self.site_id.filter(|id| id.0 != 0)?;
+        let post_id = i64::try_from(self.id).ok().filter(|id| *id > 0)?;
+        Some((site_id, PostId(post_id)))
+    }
 }
 
 /// The key to save a post under: `feed_item_id` for an RSS post, `blog_id` + `post_id` for
-/// everything else, or `None` when the post is missing the IDs it needs.
+/// everything else, or `None` when the post is missing the IDs it needs. It's also the key the
+/// cache keeps a post by.
 ///
-/// Matches `savedKeyForPost()` in wp-calypso, so a post is saved the same way on every platform.
+/// Matches `savedKeyForPost()` in wp-calypso, so a post is saved the same way on every platform,
+/// with one difference: a post with no post ID (`0`) and a feed item ID is a feed item (see
+/// [`ReaderPostSaveIdentity::is_feed_item`]), and is keyed by its feed item. wp-calypso gives such
+/// a post no key, though its streams key it by its feed and feed item.
 #[uniffi::export]
 pub fn reader_saved_key_for_post(post: ReaderPostSaveIdentity) -> Option<ReaderSavedKey> {
     if post.is_snapshot() && post.nonzero_feed_item_id().is_none() {
@@ -408,7 +500,7 @@ pub fn reader_saved_key_for_post(post: ReaderPostSaveIdentity) -> Option<ReaderS
             .map(|url| ReaderSavedKey::Url { url });
     }
 
-    if post.is_external {
+    if post.is_feed_item() {
         let feed_item_id = post
             .nonzero_feed_item_id()
             .or(Some(ReaderFeedItemId(post.id)))
@@ -416,12 +508,8 @@ pub fn reader_saved_key_for_post(post: ReaderPostSaveIdentity) -> Option<ReaderS
         return Some(ReaderSavedKey::FeedItem { feed_item_id });
     }
 
-    let blog_id = post.site_id.filter(|id| id.0 != 0)?;
-    let post_id = i64::try_from(post.id).ok().filter(|id| *id != 0)?;
-    Some(ReaderSavedKey::Post {
-        blog_id,
-        post_id: PostId(post_id),
-    })
+    let (blog_id, post_id) = post.site_post()?;
+    Some(ReaderSavedKey::Post { blog_id, post_id })
 }
 
 /// Every key a post may already be saved under, starting with [`reader_saved_key_for_post`].
@@ -431,7 +519,7 @@ pub fn reader_saved_key_for_post(post: ReaderPostSaveIdentity) -> Option<ReaderS
 /// of these keys is, and unsave with the keys that matched.
 #[uniffi::export]
 pub fn reader_saved_keys_for_post(post: ReaderPostSaveIdentity) -> Vec<ReaderSavedKey> {
-    let feed_item_id = post.nonzero_feed_item_id().filter(|_| !post.is_external);
+    let feed_item_id = post.nonzero_feed_item_id().filter(|_| !post.is_feed_item());
     let Some(key) = reader_saved_key_for_post(post) else {
         return vec![];
     };
@@ -599,6 +687,49 @@ mod tests {
             is_external: false,
             url: None,
         }
+    }
+
+    /// An item of a feed whose site the API no longer serves: `ID` is `0`, it isn't external, and
+    /// it has its site's ID.
+    fn feed_item_with_no_post_id() -> ReaderPostSaveIdentity {
+        ReaderPostSaveIdentity {
+            id: 0,
+            feed_id: Some(ReaderFeedId(5)),
+            feed_item_id: Some(ReaderFeedItemId(789)),
+            ..identity()
+        }
+    }
+
+    #[rstest]
+    #[case::wp_com_post(identity(), false, Some((WpComSiteId(123), PostId(456))))]
+    #[case::wp_com_post_read_through_following(
+        ReaderPostSaveIdentity {
+            feed_id: Some(ReaderFeedId(5)),
+            feed_item_id: Some(ReaderFeedItemId(789)),
+            ..identity()
+        },
+        false,
+        Some((WpComSiteId(123), PostId(456)))
+    )]
+    #[case::rss_post(
+        ReaderPostSaveIdentity { is_external: true, ..identity() },
+        true,
+        None
+    )]
+    #[case::feed_item_with_no_post_id(feed_item_with_no_post_id(), true, None)]
+    #[case::zero_post(ReaderPostSaveIdentity { id: 0, ..identity() }, false, None)]
+    #[case::zero_site(
+        ReaderPostSaveIdentity { site_id: Some(WpComSiteId(0)), ..identity() },
+        false,
+        None
+    )]
+    fn test_feed_item_or_site_post(
+        #[case] post: ReaderPostSaveIdentity,
+        #[case] is_feed_item: bool,
+        #[case] site_post: Option<(WpComSiteId, PostId)>,
+    ) {
+        assert_eq!(post.is_feed_item(), is_feed_item);
+        assert_eq!(post.site_post(), site_post);
     }
 
     fn deleted_feed_item_or_url_save() -> ReaderPostSaveIdentity {
@@ -1029,6 +1160,56 @@ mod tests {
         assert_eq!(response.next_page_handle, None);
     }
 
+    /// A saved post that can't be read doesn't fail its page, and isn't lost: it's listed with its
+    /// IDs, so it still reads as saved.
+    #[test]
+    fn test_deserialize_list_keeps_the_posts_it_can_read() {
+        let response: ReaderSavedPostsResponse = serde_json::from_value(json!({
+            "posts": [
+                { "ID": 1, "site_ID": 10, "is_external": false, "date_saved": "2026-11-01T00:00:00+00:00" },
+                { "ID": 2, "site_ID": 10, "is_external": false, "date": "2026-11-01T00:00:00+91:00" },
+                "not a post",
+                { "ID": 3, "site_ID": 10, "is_external": false },
+            ],
+            "next_page_handle": "abc",
+            "found": "4",
+        }))
+        .expect("the page parses");
+
+        let ids: Vec<_> = response
+            .posts
+            .iter()
+            .map(|post| post.post.identity.id)
+            .collect();
+        assert_eq!(ids, [1, 3]);
+        let unreadable: Vec<_> = response
+            .unreadable_posts
+            .iter()
+            .map(|post| post.identity.as_ref().map(|identity| identity.id))
+            .collect();
+        assert_eq!(unreadable, [Some(2), None]);
+        assert_eq!(response.next_page_handle.as_deref(), Some("abc"));
+        assert_eq!(response.found, Some(4));
+    }
+
+    #[rstest]
+    #[case(json!({ "posts": null }))]
+    #[case(json!({}))]
+    fn test_deserialize_list_without_posts(#[case] page: serde_json::Value) {
+        let response: ReaderSavedPostsResponse =
+            serde_json::from_value(page).expect("the page parses");
+        assert!(response.posts.is_empty());
+        assert!(response.unreadable_posts.is_empty());
+    }
+
+    /// Only a post that can't be read is passed over. A page that isn't a page is still an error.
+    #[test]
+    fn test_deserialize_list_rejects_posts_that_are_not_a_list() {
+        assert!(
+            serde_json::from_value::<ReaderSavedPostsResponse>(json!({ "posts": "none" })).is_err()
+        );
+    }
+
     #[test]
     fn test_deserialize_mutation_response() {
         let json = include_str!("../../tests/wpcom/reader_saved/new.json");
@@ -1252,6 +1433,8 @@ mod tests {
         ReaderPostSaveIdentity { id: 0, is_external: true, ..identity() },
         None
     )]
+    // A feed whose site the API no longer serves sends its items this way.
+    #[case::feed_item_with_no_post_id(feed_item_with_no_post_id(), Some(feed_item_key(789)))]
     #[case::url_save(deleted_feed_item_or_url_save(), Some(url_key()))]
     #[case::url_save_without_url(
         ReaderPostSaveIdentity { url: None, ..deleted_feed_item_or_url_save() },
@@ -1285,6 +1468,7 @@ mod tests {
         },
         vec![feed_item_key(789)]
     )]
+    #[case::feed_item_with_no_post_id(feed_item_with_no_post_id(), vec![feed_item_key(789)])]
     #[case::unsaveable(ReaderPostSaveIdentity { id: 0, ..identity() }, vec![])]
     fn test_saved_keys_for_post(
         #[case] post: ReaderPostSaveIdentity,

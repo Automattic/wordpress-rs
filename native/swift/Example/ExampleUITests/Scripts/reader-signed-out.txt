@@ -1,0 +1,109 @@
+// Every Reader screen, as the reader who isn't signed in. Nothing here changes an account: what it follows and
+// saves stays on the simulator, and it puts both back.
+//
+// Run it with scripts/example-app-ui-script.sh. The steps are listed in ScriptedUITests.swift.
+
+launch
+tap Reader
+waitfor Streams
+wait 3
+shot 01-home
+tap Sync
+wait 3
+
+// A tag, followed on this device only.
+type #tag-slug => knitting
+tap #follow-tag-by-slug
+wait 2
+top
+shot 02-tag-followed
+tap Latest from my tags
+waitfor ~Loaded 60
+shot 03-latest-from-my-tags
+back
+
+// Streams: one of cards, with its second page, and one ordered by date. A refresh replaces what the cache has of
+// Discover, so its end is as near each time this runs. Freshly Pressed keeps the pages it has loaded.
+tap Discover
+waitfor ~Loaded 60
+shot 04-discover
+bottom 6
+tap #stream-load-more
+wait 8
+top
+shot 05-loaded-more
+back
+tap Freshly Pressed
+waitfor #stream-post 60
+shot 06-freshly-pressed
+
+// What a reader does to a post: a save stays on the device, and a like needs an account.
+tap 0:#stream-post-actions
+tapnow Save
+wait 2
+shot 07-post-saved
+tap 0:#stream-post-actions
+tapnow Like
+wait 2
+shot 08-like-needs-an-account
+alert OK
+
+// A post, its content, its comments, who liked it and its related posts.
+tap 0:#stream-post
+waitfor #post-state 30
+wait 5
+shot 09-post
+tap Read the whole post
+wait 4
+shot 10-content
+back
+top
+tap Comments
+waitfor ~Loaded 40
+shot 11-comments
+back
+tap Who liked it
+wait 6
+shot 12-likes
+back
+tap Related posts
+waitfor ~Loaded 40
+shot 13-related-posts
+back
+back
+back
+
+// The saved list, then the screens that need an account, which say so.
+tap Saved posts
+wait 3
+shot 14-saved-posts
+tap 0:Unsave
+wait 2
+back
+tap Subscriptions
+wait 3
+shot 15-subscriptions-need-an-account
+back
+tap Blocked sites
+wait 3
+shot 16-blocked-sites
+back
+tap Find sites
+type #find-sites-query => photography
+tap #find-sites
+wait 8
+shot 17-find-sites
+back
+
+// With no connection, a stream shows what the cache has and says why the refresh failed.
+top
+tap #unfollow-tag-knitting
+wait 2
+tap Simulate no connection
+top
+tap Freshly Pressed
+tap #stream-refresh
+wait 3
+shot 18-no-connection
+back
+tap Simulate no connection

@@ -101,8 +101,10 @@ struct WPComRootView: View {
 }
 
 #Preview {
-    // swiftlint:disable force_try
+    // swiftlint:disable:next force_try
+    let loginManager = try! LoginManager()
     WPComRootView()
-        .environmentObject(WPComService(loginManager: try! LoginManager()))
-    // swiftlint:enable force_try
+        .environmentObject(
+            WPComService(loginManager: loginManager, readerStore: ReaderStore(loginManager: loginManager))
+        )
 }

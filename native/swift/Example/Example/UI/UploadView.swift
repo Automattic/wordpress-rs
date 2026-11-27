@@ -1,3 +1,6 @@
+// tvOS has no photo picker and no file importer, so there's nothing to upload from: this screen is left out
+// of the Apple TV app.
+#if !os(tvOS)
 import Foundation
 import SwiftUI
 import PhotosUI
@@ -216,3 +219,4 @@ class UploadViewModel: ObservableObject {
         }
     }
 }
+#endif

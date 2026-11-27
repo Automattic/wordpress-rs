@@ -1,0 +1,23 @@
+{
+  "blog_ID": "0",
+  "feed_ID": "3002",
+  "blog_owner": null,
+  "name": "Example Feed",
+  "URL": "https://example.com/",
+  "feed_URL": "https://example.com/feed/",
+  "subscribers_count": 1234,
+  "is_following": false,
+  "last_update": "2026-11-18T00:00:00+00:00",
+  "last_checked": "2026-11-18T23:09:01+00:00",
+  "marked_for_refresh": false,
+  "next_refresh_time": null,
+  "organization_id": 0,
+  "subscription_id": null,
+  "unseen_count": 7,
+  "meta": {
+    "links": {
+      "self": "https://public-api.wordpress.com/rest/v1.1/read/feed/3002"
+    }
+  },
+  "resolved_feed_url": "https://example.com/feed/"
+}

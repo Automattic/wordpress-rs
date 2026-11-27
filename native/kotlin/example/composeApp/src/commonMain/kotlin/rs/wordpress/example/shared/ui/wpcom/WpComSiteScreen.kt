@@ -26,6 +26,7 @@ fun WpComSiteScreen(
     onSupportConversationsClicked: () -> Unit,
     onUnifiedConversationsClicked: () -> Unit,
     onBotConversationsClicked: () -> Unit,
+    onReaderClicked: () -> Unit,
     onReaderSavedPostsClicked: () -> Unit,
     onBackClicked: () -> Unit = {}
 ) {
@@ -78,6 +79,15 @@ fun WpComSiteScreen(
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                     },
                     modifier = Modifier.clickable(onClick = onBotConversationsClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Reader") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onReaderClicked)
                 )
             }
             item {

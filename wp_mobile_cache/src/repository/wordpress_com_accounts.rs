@@ -2,8 +2,33 @@ use crate::{RowId, SqliteDbError, repository::QueryExecutor};
 use rusqlite::OptionalExtension;
 use wp_api::wp_com::me::WpComUserId;
 
+/// Who Reader data in the cache belongs to: a WordPress.com account, or the reader who isn't signed
+/// in. The Reader works without an account, so its posts, streams and followed tags need an owner
+/// then too.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum ReaderOwner {
+    Account {
+        user_id: WpComUserId,
+    },
+    /// The reader who isn't signed in to WordPress.com. A cache has one.
+    SignedOut,
+}
+
+/// The `user_id` of the row that owns the signed-out reader's data. WordPress uses `0` for "no
+/// user", and no account has it.
+const SIGNED_OUT_USER_ID: WpComUserId = WpComUserId(0);
+
+impl ReaderOwner {
+    fn user_id(&self) -> WpComUserId {
+        match self {
+            Self::Account { user_id } => *user_id,
+            Self::SignedOut => SIGNED_OUT_USER_ID,
+        }
+    }
+}
+
 /// WordPress.com accounts. Account-level data, such as the Reader, references an account's row and
-/// is deleted with it.
+/// is deleted with it. The signed-out reader has a row here too: see [`ReaderOwner`].
 pub struct WordPressComAccountRepository;
 
 impl WordPressComAccountRepository {
@@ -45,6 +70,30 @@ impl WordPressComAccountRepository {
         )?;
         Ok(deleted > 0)
     }
+
+    /// The row that owns a reader's data, created if it doesn't exist yet.
+    pub fn get_or_create_owner(
+        executor: &impl QueryExecutor,
+        owner: ReaderOwner,
+    ) -> Result<RowId, SqliteDbError> {
+        Self::get_or_create(executor, owner.user_id())
+    }
+
+    /// The row that owns a reader's data, if anything has been cached for them.
+    pub fn select_owner(
+        executor: &impl QueryExecutor,
+        owner: ReaderOwner,
+    ) -> Result<Option<RowId>, SqliteDbError> {
+        Self::select(executor, owner.user_id())
+    }
+
+    /// Deletes everything cached for a reader. Returns whether there was anything.
+    pub fn delete_owner(
+        executor: &impl QueryExecutor,
+        owner: ReaderOwner,
+    ) -> Result<bool, SqliteDbError> {
+        Self::delete(executor, owner.user_id())
+    }
 }
 
 #[cfg(test)]
@@ -81,6 +130,58 @@ mod tests {
         assert_eq!(
             WordPressComAccountRepository::select(&conn, WpComUserId(7)).unwrap(),
             None
+        );
+    }
+
+    #[test]
+    fn test_the_signed_out_reader_has_a_row_of_its_own() {
+        let conn = conn();
+        let account = ReaderOwner::Account {
+            user_id: WpComUserId(7),
+        };
+        let signed_out =
+            WordPressComAccountRepository::get_or_create_owner(&conn, ReaderOwner::SignedOut)
+                .unwrap();
+        let again =
+            WordPressComAccountRepository::get_or_create_owner(&conn, ReaderOwner::SignedOut)
+                .unwrap();
+        let account_row =
+            WordPressComAccountRepository::get_or_create_owner(&conn, account).unwrap();
+        assert_eq!(signed_out, again);
+        assert_ne!(signed_out, account_row);
+        assert_eq!(
+            WordPressComAccountRepository::get_or_create(&conn, WpComUserId(7)).unwrap(),
+            account_row,
+            "An account's owner row is the account's row"
+        );
+    }
+
+    #[test]
+    fn test_removing_an_account_leaves_the_signed_out_reader() {
+        let conn = conn();
+        let account = ReaderOwner::Account {
+            user_id: WpComUserId(7),
+        };
+        let signed_out =
+            WordPressComAccountRepository::get_or_create_owner(&conn, ReaderOwner::SignedOut)
+                .unwrap();
+        WordPressComAccountRepository::get_or_create_owner(&conn, account).unwrap();
+
+        assert!(WordPressComAccountRepository::delete_owner(&conn, account).unwrap());
+        assert_eq!(
+            WordPressComAccountRepository::select_owner(&conn, ReaderOwner::SignedOut).unwrap(),
+            Some(signed_out)
+        );
+        assert_eq!(
+            WordPressComAccountRepository::select_owner(&conn, account).unwrap(),
+            None
+        );
+
+        assert!(
+            WordPressComAccountRepository::delete_owner(&conn, ReaderOwner::SignedOut).unwrap()
+        );
+        assert!(
+            !WordPressComAccountRepository::delete_owner(&conn, ReaderOwner::SignedOut).unwrap()
         );
     }
 

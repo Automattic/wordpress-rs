@@ -1,0 +1,11 @@
+{
+  "success": true,
+  "is_following": true,
+  "meta": {
+    "links": {
+      "site": "https://public-api.wordpress.com/rest/v1.1/sites/100000001",
+      "help": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/follows/new/help",
+      "posts": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/posts/"
+    }
+  }
+}

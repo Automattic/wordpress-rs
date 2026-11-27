@@ -15,6 +15,7 @@ struct ExampleApp: App {
     private let loginManager: LoginManager
     private let selfHostedService: SelfHostedService
     private let wpcomService: WPComService
+    private let readerStore: ReaderStore
 
     init() {
         // swiftlint:disable:next force_try
@@ -43,7 +44,8 @@ struct ExampleApp: App {
         // swiftlint:disable:next force_try
         self.loginManager = try! LoginManager()
         self.selfHostedService = SelfHostedService(loginManager: self.loginManager)
-        self.wpcomService = WPComService(loginManager: self.loginManager)
+        self.readerStore = ReaderStore(loginManager: self.loginManager)
+        self.wpcomService = WPComService(loginManager: self.loginManager, readerStore: self.readerStore)
     }
 
     var body: some Scene {
@@ -56,11 +58,17 @@ struct ExampleApp: App {
                 Tab("WordPress.com", systemImage: "network") {
                     WPComRootView()
                 }
+
+                // Works without an account, so it isn't under the WordPress.com tab.
+                Tab("Reader", systemImage: "book") {
+                    ReaderRootView()
+                }
             }
         }
         .environmentObject(self.loginManager)
         .environmentObject(self.selfHostedService)
         .environmentObject(self.wpcomService)
+        .environment(self.readerStore)
     }
 
     var toolbarItemPlacement: ToolbarItemPlacement {

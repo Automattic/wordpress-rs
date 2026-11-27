@@ -7,8 +7,10 @@ use std::sync::{Arc, Mutex};
 use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
 use crate::repository::reader::ReaderStreamRepository;
+use crate::repository::reader_comments::{ReaderCommentRepository, ReaderCommentThreadRepository};
+use crate::repository::reader_offline::ReaderOfflineRepository;
 use crate::repository::sites::SiteRepository;
-use crate::repository::wordpress_com_accounts::WordPressComAccountRepository;
+use crate::repository::wordpress_com_accounts::{ReaderOwner, WordPressComAccountRepository};
 use wp_api::parsed_url::ParsedUrl;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
@@ -127,6 +129,34 @@ pub enum DbTable {
     ReaderSavedPosts,
     /// The URLs the server stores as a saved post
     ReaderSavedPostUrls,
+    /// Posts a Reader stream's page had that couldn't be read
+    ReaderUnreadablePosts,
+    /// What the user turned on or off in the Reader that the server doesn't have yet
+    ReaderActions,
+    /// The sites the user blocked in the Reader
+    ReaderBlockedSites,
+    /// The users the reader blocked, on this device
+    ReaderBlockedUsers,
+    /// The sites the account is a member of
+    ReaderMemberSites,
+    /// When each of a reader's lists was last fetched whole
+    ReaderSyncTimes,
+    /// Cards in a Reader stream that aren't posts
+    ReaderStreamCards,
+    /// The Reader menu, with the tags a reader follows
+    ReaderMenuItems,
+    /// The sites and feeds an account follows
+    ReaderSubscriptions,
+    /// What the Reader shows of a site or a feed besides its posts
+    ReaderSites,
+    /// Posts' comments, and comments written on this device
+    ReaderComments,
+    /// Where each post's comments are up to
+    ReaderCommentThreads,
+    /// What the device has of each saved post for reading with no connection
+    ReaderSavedOffline,
+    /// The stored images of saved posts
+    ReaderOfflineFiles,
 }
 
 impl DbTable {
@@ -156,6 +186,20 @@ impl DbTable {
             DbTable::ReaderSavedState => "reader_saved_state",
             DbTable::ReaderSavedPosts => "reader_saved_posts",
             DbTable::ReaderSavedPostUrls => "reader_saved_post_urls",
+            DbTable::ReaderUnreadablePosts => "reader_unreadable_posts",
+            DbTable::ReaderActions => "reader_actions",
+            DbTable::ReaderBlockedSites => "reader_blocked_sites",
+            DbTable::ReaderBlockedUsers => "reader_blocked_users",
+            DbTable::ReaderMemberSites => "reader_member_sites",
+            DbTable::ReaderSyncTimes => "reader_sync_times",
+            DbTable::ReaderStreamCards => "reader_stream_cards",
+            DbTable::ReaderMenuItems => "reader_menu_items",
+            DbTable::ReaderSubscriptions => "reader_subscriptions",
+            DbTable::ReaderSites => "reader_sites",
+            DbTable::ReaderComments => "reader_comments",
+            DbTable::ReaderCommentThreads => "reader_comment_threads",
+            DbTable::ReaderSavedOffline => "reader_saved_offline",
+            DbTable::ReaderOfflineFiles => "reader_offline_files",
         }
     }
 }
@@ -198,6 +242,20 @@ impl TryFrom<&str> for DbTable {
             "reader_saved_state" => Ok(DbTable::ReaderSavedState),
             "reader_saved_posts" => Ok(DbTable::ReaderSavedPosts),
             "reader_saved_post_urls" => Ok(DbTable::ReaderSavedPostUrls),
+            "reader_unreadable_posts" => Ok(DbTable::ReaderUnreadablePosts),
+            "reader_actions" => Ok(DbTable::ReaderActions),
+            "reader_blocked_sites" => Ok(DbTable::ReaderBlockedSites),
+            "reader_blocked_users" => Ok(DbTable::ReaderBlockedUsers),
+            "reader_member_sites" => Ok(DbTable::ReaderMemberSites),
+            "reader_sync_times" => Ok(DbTable::ReaderSyncTimes),
+            "reader_stream_cards" => Ok(DbTable::ReaderStreamCards),
+            "reader_menu_items" => Ok(DbTable::ReaderMenuItems),
+            "reader_subscriptions" => Ok(DbTable::ReaderSubscriptions),
+            "reader_sites" => Ok(DbTable::ReaderSites),
+            "reader_comments" => Ok(DbTable::ReaderComments),
+            "reader_comment_threads" => Ok(DbTable::ReaderCommentThreads),
+            "reader_saved_offline" => Ok(DbTable::ReaderSavedOffline),
+            "reader_offline_files" => Ok(DbTable::ReaderOfflineFiles),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -352,6 +410,15 @@ impl WpApiCache {
             if let Err(e) = ReaderStreamRepository::reset_stale_fetching_states(connection) {
                 log::warn!("Failed to reset stale Reader stream states: {}", e);
             }
+            if let Err(e) = ReaderCommentThreadRepository::reset_stale_fetching_states(connection) {
+                log::warn!("Failed to reset stale Reader comment states: {}", e);
+            }
+            if let Err(e) = ReaderCommentRepository::fail_comments_left_sending(connection) {
+                log::warn!("Failed to mark Reader comments left sending: {}", e);
+            }
+            if let Err(e) = ReaderOfflineRepository::reset_downloading(connection) {
+                log::warn!("Failed to reset Reader downloads left running: {}", e);
+            }
 
             // Clear abandoned fetch operations after migrations complete.
             // Deletes Fetching states to prevent stuck loading indicators while
@@ -426,8 +493,13 @@ impl WpApiCache {
         })
     }
 
-    /// Remove a WordPress.com account and everything cached for it, such as its Reader posts and
-    /// saved posts. Call it when the user signs out.
+    /// Remove a WordPress.com account and everything the cache holds for it, such as its Reader
+    /// posts and saved posts. Call it when the user signs out.
+    ///
+    /// The image files of the saved posts aren't in the cache, and this leaves them on disk. Call
+    /// `ReaderSavedService::remove_offline_images` first, with its image store set, to delete them
+    /// at once. Otherwise the saved service deletes them the next time a reader's image store is
+    /// set or images are downloaded.
     ///
     /// Returns `true` if the account was found and removed, `false` if nothing was cached for it.
     pub fn remove_wordpress_com_account(
@@ -435,6 +507,19 @@ impl WpApiCache {
         user_id: WpComUserId,
     ) -> Result<bool, SqliteDbError> {
         self.execute(|connection| WordPressComAccountRepository::delete(connection, user_id))
+    }
+
+    /// Remove everything cached for a reader, such as their Reader posts, streams and followed
+    /// tags. For an account it's the same as [`Self::remove_wordpress_com_account`]. For
+    /// [`ReaderOwner::SignedOut`] it removes what was kept while nobody was signed in, such as
+    /// after it's been moved to an account.
+    ///
+    /// Like [`Self::remove_wordpress_com_account`], it leaves the saved posts' image files on
+    /// disk: call `ReaderSavedService::remove_offline_images` first to delete them at once.
+    ///
+    /// Returns `true` if anything was cached for the reader.
+    pub fn remove_reader_data(&self, owner: ReaderOwner) -> Result<bool, SqliteDbError> {
+        self.execute(|connection| WordPressComAccountRepository::delete_owner(connection, owner))
     }
 }
 
@@ -505,7 +590,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 15] = [
+static MIGRATION_QUERIES: [&str; 23] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -521,6 +606,14 @@ static MIGRATION_QUERIES: [&str; 15] = [
     include_str!("../migrations/0013-invalidate-post-entity-states-for-meta.sql"),
     include_str!("../migrations/0014-create-media-edit-context-table.sql"),
     include_str!("../migrations/0015-create-wordpress-com-account-and-reader-tables.sql"),
+    include_str!("../migrations/0016-create-reader-unreadable-posts-table.sql"),
+    include_str!("../migrations/0017-create-reader-actions-tables.sql"),
+    include_str!("../migrations/0018-create-reader-member-sites-table.sql"),
+    include_str!("../migrations/0019-create-reader-stream-cards-table.sql"),
+    include_str!("../migrations/0020-add-computed-fields-to-reader-posts.sql"),
+    include_str!("../migrations/0021-create-reader-menu-subscriptions-and-sites-tables.sql"),
+    include_str!("../migrations/0022-create-reader-comments-tables.sql"),
+    include_str!("../migrations/0023-create-reader-offline-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {

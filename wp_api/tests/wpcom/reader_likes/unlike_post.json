@@ -1,0 +1,30 @@
+{
+  "success": false,
+  "i_like": false,
+  "like_count": 0,
+  "site_ID": 100000001,
+  "post_ID": 3,
+  "meta": {
+    "links": {
+      "help": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/posts/3/likes/mine/delete/help",
+      "post": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/posts/3",
+      "site": "https://public-api.wordpress.com/rest/v1.1/sites/100000001"
+    }
+  },
+  "liker": {
+    "ID": 1001,
+    "login": "exampleuser1",
+    "email": false,
+    "name": "Example User One",
+    "first_name": "Example",
+    "last_name": "One",
+    "nice_name": "exampleuser1",
+    "URL": "",
+    "avatar_URL": "https://1.gravatar.com/avatar/0000000000000000000000000000000000000000000000000000000000000001?s=96&d=identicon&r=G",
+    "profile_URL": "https://gravatar.com/exampleuser1",
+    "ip_address": false,
+    "site_ID": 2001,
+    "site_visible": true,
+    "default_avatar": false
+  }
+}

@@ -92,33 +92,28 @@ final class LoginManager: ObservableObject {
         self.isLoggedIn = accountStore.hasSelfHostedAccount()
         self.isLoggedInToWpCom = accountStore.hasWpComAccount()
 
-        try self.signInToWpComFromLaunchArgumentIfNeeded()
+        try self.signInToWpComFromTokenFileIfNeeded()
     }
 
-    /// A WordPress.com bearer token supplied with the `-wpcom-token <token>` launch argument, used to sign a
-    /// Simulator in without the OAuth flow. See `scripts/example-app-signin.sh`.
+    /// A file in the app's own `Library` folder that holds a WordPress.com bearer token, used to sign a Simulator
+    /// in without the OAuth flow. `scripts/example-app-signin.sh` writes it from standard input, so that the token
+    /// is on no command line, where `ps` would show it.
+    static let tokenFile = URL.libraryDirectory.appending(path: "wpcom-token")
+
+    /// Stores the token in `tokenFile` as the WordPress.com account, unless one is already signed in, and deletes
+    /// the file.
     ///
-    /// Read from the raw process arguments rather than `UserDefaults`, which parses argument values as
-    /// property lists and could mangle a token containing plist syntax.
-    static var launchArgumentToken: String? {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard
-            let index = arguments.firstIndex(of: "-wpcom-token"),
-            arguments.indices.contains(index + 1)
-        else {
-            return nil
+    /// Only called from `init`, and the file is deleted first, so it runs at most once per sign-in — signing out
+    /// doesn't sign the account back in.
+    private func signInToWpComFromTokenFileIfNeeded() throws {
+        let file = Self.tokenFile
+        guard FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) else {
+            return
         }
 
-        let token = arguments[index + 1].trimmingCharacters(in: .whitespacesAndNewlines)
-        return token.isEmpty ? nil : token
-    }
-
-    /// Stores the `-wpcom-token` launch argument as the WordPress.com account, unless one is already signed in.
-    ///
-    /// Only called from `init`, so it runs at most once per process — signing out doesn't immediately sign the
-    /// account back in with the still-present launch argument.
-    private func signInToWpComFromLaunchArgumentIfNeeded() throws {
-        guard let token = Self.launchArgumentToken, !isLoggedInToWpCom else {
+        let token = try String(contentsOf: file, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        try FileManager.default.removeItem(at: file)
+        guard !token.isEmpty, !isLoggedInToWpCom else {
             return
         }
 

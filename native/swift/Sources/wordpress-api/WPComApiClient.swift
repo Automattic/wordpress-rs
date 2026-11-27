@@ -89,13 +89,59 @@ public final class WPComApiClient: Sendable {
         internalClient.subscribers()
     }
 
-    /// The Reader streams: Following, and a site's or a feed's posts.
+    /// The Reader's streams of posts.
     public var readerPosts: ReaderPostsRequestExecutor {
         internalClient.readerPosts()
     }
 
+    /// One Reader post at a time: a site's post, a feed's post, a post found by its slug or its
+    /// address, and the posts related to a post.
+    public var readerPost: ReaderPostRequestExecutor {
+        internalClient.readerPost()
+    }
+
     public var readerSaved: ReaderSavedRequestExecutor {
         internalClient.readerSaved()
+    }
+
+    /// Marks posts as seen or unseen. Needs an account.
+    public var readerSeen: ReaderSeenRequestExecutor {
+        internalClient.readerSeen()
+    }
+
+    /// The sites the user blocked, and blocking and unblocking one. Needs an account.
+    public var readerBlocks: ReaderBlocksRequestExecutor {
+        internalClient.readerBlocks()
+    }
+
+    /// The Reader's sites and feeds: a site's info, a feed's info, and the search that finds them.
+    public var readerSites: ReaderSitesRequestExecutor {
+        internalClient.readerSites()
+    }
+
+    /// The sites and feeds the user is subscribed to in the Reader.
+    public var readerSubscriptions: ReaderSubscriptionsRequestExecutor {
+        internalClient.readerSubscriptions()
+    }
+
+    /// The Reader menu, a tag's info, and the interests a new reader picks from.
+    public var readerTags: ReaderTagsRequestExecutor {
+        internalClient.readerTags()
+    }
+
+    /// The users who liked a post or a comment.
+    public var readerLikes: ReaderLikesRequestExecutor {
+        internalClient.readerLikes()
+    }
+
+    /// A post's comments, and the user's subscription to them.
+    public var readerComments: ReaderCommentsRequestExecutor {
+        internalClient.readerComments()
+    }
+
+    /// A WordPress.com user's public profile, as the Reader shows it.
+    public var readerUsers: ReaderUsersRequestExecutor {
+        internalClient.readerUsers()
     }
 
     /// Creates the account's saved Reader posts service. Prefer it over `readerSaved` for anything a
@@ -114,6 +160,27 @@ public final class WPComApiClient: Sendable {
         userID: WpComUserId
     ) throws -> ReaderSavedService {
         try ReaderSavedService(delegate: delegate, source: source, cache: cache.cache, userId: userID)
+    }
+
+    /// Creates the Reader service for one reader: an account, or the device when no one is signed
+    /// in. It keeps streams, posts, comments, follows and saves in `cache`, shows a change at once,
+    /// and sends it when it can.
+    ///
+    /// For a signed-out reader, use `.signedOut` with a client that sends no authentication. What
+    /// that reader follows and saves stays on the device.
+    ///
+    /// The cache's migrations must have run. `savedSource` is the app, which is recorded with each
+    /// save. Call `syncActions()` at launch, when the app comes to the foreground, and when the
+    /// device comes back online.
+    ///
+    /// Create one per reader and share it: it sends one change at a time, and a second instance
+    /// would send alongside it.
+    public func makeReaderService(
+        cache: WordPressApiCache,
+        owner: ReaderOwner,
+        savedSource: ReaderSavedSource
+    ) throws -> ReaderService {
+        try ReaderService(delegate: delegate, cache: cache.cache, owner: owner, savedSource: savedSource)
     }
 
     public var supportBots: SupportBotsRequestExecutor {

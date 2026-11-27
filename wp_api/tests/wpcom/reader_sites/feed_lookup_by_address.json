@@ -1,0 +1,22 @@
+{
+  "feeds": [
+    {
+      "subscribe_URL": "https://example.com/atom.xml",
+      "feed_ID": "3001",
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/3001"
+        }
+      }
+    },
+    {
+      "subscribe_URL": "https://example.com/rss.xml",
+      "feed_ID": "3002",
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/3002"
+        }
+      }
+    }
+  ]
+}

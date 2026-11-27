@@ -1,0 +1,392 @@
+{
+  "algorithm_local": "read:related:posts:local/7",
+  "algorithm_global": "read:related:posts:global/2",
+  "posts": [
+    {
+      "ID": 1002,
+      "site_ID": 2001,
+      "author": {
+        "ID": 5001,
+        "login": "example",
+        "email": false,
+        "name": "Example Name",
+        "first_name": "Example",
+        "last_name": "Name",
+        "nice_name": "example",
+        "URL": "https://example1.wordpress.com",
+        "avatar_URL": "https://example.com/avatar.png",
+        "profile_URL": "https://example.com/example-author",
+        "site_ID": 2011,
+        "has_avatar": true,
+        "wpcom_id": 5001,
+        "wpcom_login": "example"
+      },
+      "date": "2026-11-03T20:45:00+00:00",
+      "modified": "2026-11-04T19:39:21+00:00",
+      "title": "Example post",
+      "URL": "https://example1.wordpress.com/2026/11/03/example-post/",
+      "short_URL": "https://wp.me/pEXAMPLE-1",
+      "content": "<p>Example content.</p>\n",
+      "excerpt": "<p>Example excerpt.</p>\n",
+      "slug": "example-post",
+      "guid": "https://example1.wordpress.com/example/",
+      "status": "publish",
+      "sticky": false,
+      "password": "",
+      "has_password": false,
+      "parent": false,
+      "type": "post",
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": false,
+        "ping_status": "closed",
+        "comment_count": 11,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "likes_enabled": true,
+      "sharing_enabled": true,
+      "like_count": 150,
+      "i_like": false,
+      "is_reblogged": false,
+      "is_following": false,
+      "global_ID": "00000000000000000000000000000001",
+      "featured_image": "https://example1.wordpress.com/wp-content/uploads/2026/11/example.png",
+      "post_thumbnail": {
+        "ID": 6001,
+        "URL": "https://example1.wordpress.com/example/",
+        "guid": "https://example1.wordpress.com/wp-content/uploads/2026/11/example.png",
+        "mime_type": "image/png",
+        "width": 2350,
+        "height": 1480
+      },
+      "format": "standard",
+      "geo": false,
+      "menu_order": 0,
+      "page_template": "",
+      "publicize_URLs": [],
+      "terms": {
+        "category": {
+          "Example Category": {
+            "ID": 7002,
+            "name": "Example Category",
+            "slug": "example-category",
+            "description": "An example description.",
+            "post_count": 890,
+            "parent": 0,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/2001/categories/slug:example-category",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/2001/categories/slug:example-category/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/2001"
+              }
+            }
+          }
+        },
+        "post_tag": {
+          "Example Tag": {
+            "ID": 7001,
+            "name": "Example Tag",
+            "slug": "example-tag",
+            "description": "",
+            "post_count": 6,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/2001/tags/slug:example-tag",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/2001/tags/slug:example-tag/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/2001"
+              }
+            }
+          }
+        },
+        "post_format": {},
+        "mentions": {}
+      },
+      "tags": {
+        "Example Tag": {
+          "ID": 7001,
+          "name": "Example Tag",
+          "slug": "example-tag",
+          "description": "",
+          "post_count": 6,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/2001/tags/slug:example-tag",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/2001/tags/slug:example-tag/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/2001"
+            }
+          },
+          "display_name": "example-tag"
+        }
+      },
+      "categories": {
+        "Example Category": {
+          "ID": 7002,
+          "name": "Example Category",
+          "slug": "example-category",
+          "description": "An example description.",
+          "post_count": 890,
+          "parent": 0,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/2001/categories/slug:example-category",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/2001/categories/slug:example-category/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/2001"
+            }
+          }
+        }
+      },
+      "attachments": {},
+      "attachment_count": 0,
+      "metadata": [
+        {
+          "id": "9001",
+          "key": "Example key",
+          "value": "Example value"
+        }
+      ],
+      "meta": {
+        "links": {
+          "self": "https://public-api.wordpress.com/rest/v1.1/sites/2001/posts/1002",
+          "help": "https://public-api.wordpress.com/rest/v1.2/sites/2001/posts/1002/help",
+          "site": "https://public-api.wordpress.com/rest/v1.2/sites/2001",
+          "replies": "https://public-api.wordpress.com/rest/v1.1/sites/2001/posts/1002/replies/",
+          "likes": "https://public-api.wordpress.com/rest/v1.2/sites/2001/posts/1002/likes/"
+        }
+      },
+      "capabilities": {
+        "publish_post": true,
+        "delete_post": true,
+        "edit_post": true
+      },
+      "other_URLs": {},
+      "pseudo_ID": "00000000000000000000000000000001",
+      "is_external": false,
+      "site_name": "Example Site",
+      "site_URL": "https://example1.wordpress.com",
+      "site_is_private": false,
+      "organization_id": 0,
+      "site_icon": {
+        "img": "https://example.com/icon.png",
+        "ico": "https://example.com/icon.png"
+      },
+      "featured_media": {
+        "uri": "https://example1.wordpress.com/wp-content/uploads/2026/11/example.png",
+        "width": 1746,
+        "height": 1574,
+        "type": "image"
+      },
+      "feed_ID": 3001,
+      "feed_URL": "https://example1.wordpress.com",
+      "use_excerpt": false,
+      "is_jetpack": false,
+      "is_following_conversation": false,
+      "is_subscribed_comments": false,
+      "can_subscribe_comments": false,
+      "subscribed_comments_notifications": false,
+      "tagged_on": "2026-11-19T05:22:44+00:00",
+      "railcar": {
+        "railcar": "EXAMPLErailcar",
+        "fetch_algo": "read:related:posts:local/7",
+        "fetch_position": 0,
+        "rec_blog_id": 2001,
+        "rec_post_id": 1002,
+        "fetch_query": "blog_id:2001,post_id:1001"
+      }
+    },
+    {
+      "ID": 1003,
+      "site_ID": 2002,
+      "author": {
+        "ID": 5002,
+        "login": "example",
+        "email": false,
+        "name": "Example Name",
+        "first_name": "",
+        "last_name": "",
+        "nice_name": "example",
+        "URL": "https://example2.wordpress.com",
+        "avatar_URL": "https://example.com/avatar.png",
+        "profile_URL": "https://example.com/example-author",
+        "site_ID": 2002,
+        "has_avatar": true,
+        "wpcom_id": 5002,
+        "wpcom_login": "example"
+      },
+      "date": "2026-07-28T19:30:00+08:00",
+      "modified": "2026-07-28T16:45:32+08:00",
+      "title": "Example post",
+      "URL": "https://example2.wordpress.com/2026/07/28/example-post/",
+      "short_URL": "https://wp.me/pEXAMPLE-1",
+      "content": "<p>Example content.</p>\n",
+      "excerpt": "<p>Example excerpt.</p>\n",
+      "slug": "example-post",
+      "guid": "https://example2.wordpress.com/example/",
+      "status": "publish",
+      "sticky": false,
+      "password": "",
+      "has_password": false,
+      "parent": false,
+      "type": "post",
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": true,
+        "ping_status": "open",
+        "comment_count": 0,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "likes_enabled": true,
+      "sharing_enabled": true,
+      "like_count": 1,
+      "i_like": false,
+      "is_reblogged": false,
+      "is_following": false,
+      "global_ID": "00000000000000000000000000000001",
+      "featured_image": "https://example2.wordpress.com/wp-content/uploads/2026/11/example.png",
+      "post_thumbnail": {
+        "ID": 6002,
+        "URL": "https://example2.wordpress.com/example/",
+        "guid": "https://example2.wordpress.com/wp-content/uploads/2026/11/example.png",
+        "mime_type": "image/png",
+        "width": 1536,
+        "height": 1024
+      },
+      "format": "standard",
+      "geo": false,
+      "menu_order": 0,
+      "page_template": "",
+      "publicize_URLs": [],
+      "terms": {
+        "category": {
+          "Example Category": {
+            "ID": 7002,
+            "name": "Example Category",
+            "slug": "example-category",
+            "description": "",
+            "post_count": 64,
+            "parent": 0,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/2002/categories/slug:example-category",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/2002/categories/slug:example-category/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/2002"
+              }
+            }
+          }
+        },
+        "post_tag": {
+          "Example Tag": {
+            "ID": 7001,
+            "name": "Example Tag",
+            "slug": "example-tag",
+            "description": "",
+            "post_count": 35,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/2002/tags/slug:example-tag",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/2002/tags/slug:example-tag/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/2002"
+              }
+            }
+          }
+        },
+        "post_format": {},
+        "mentions": {}
+      },
+      "tags": {
+        "Example Tag": {
+          "ID": 7001,
+          "name": "Example Tag",
+          "slug": "example-tag",
+          "description": "",
+          "post_count": 35,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/2002/tags/slug:example-tag",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/2002/tags/slug:example-tag/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/2002"
+            }
+          },
+          "display_name": "example-tag"
+        }
+      },
+      "categories": {
+        "Example Category": {
+          "ID": 7002,
+          "name": "Example Category",
+          "slug": "example-category",
+          "description": "",
+          "post_count": 64,
+          "parent": 0,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/2002/categories/slug:example-category",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/2002/categories/slug:example-category/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/2002"
+            }
+          }
+        }
+      },
+      "attachments": {},
+      "attachment_count": 0,
+      "metadata": [
+        {
+          "id": "9001",
+          "key": "Example key",
+          "value": "Example value"
+        }
+      ],
+      "meta": {
+        "links": {
+          "self": "https://public-api.wordpress.com/rest/v1.1/sites/2002/posts/1003",
+          "help": "https://public-api.wordpress.com/rest/v1.2/sites/2002/posts/1003/help",
+          "site": "https://public-api.wordpress.com/rest/v1.2/sites/2002",
+          "replies": "https://public-api.wordpress.com/rest/v1.1/sites/2002/posts/1003/replies/",
+          "likes": "https://public-api.wordpress.com/rest/v1.2/sites/2002/posts/1003/likes/"
+        }
+      },
+      "capabilities": {
+        "publish_post": false,
+        "delete_post": false,
+        "edit_post": false
+      },
+      "other_URLs": {},
+      "pseudo_ID": "00000000000000000000000000000001",
+      "is_external": false,
+      "site_name": "Example Site",
+      "site_URL": "https://example2.wordpress.com",
+      "site_is_private": false,
+      "organization_id": 0,
+      "site_icon": {
+        "img": "https://example.com/icon.png",
+        "ico": "https://example.com/icon.png"
+      },
+      "featured_media": {
+        "uri": "https://example2.wordpress.com/wp-content/uploads/2026/11/example.png",
+        "width": 0,
+        "height": 0,
+        "type": "image"
+      },
+      "feed_ID": 3002,
+      "feed_URL": "https://example2.wordpress.com",
+      "use_excerpt": false,
+      "is_jetpack": false,
+      "is_following_conversation": false,
+      "is_subscribed_comments": false,
+      "can_subscribe_comments": false,
+      "subscribed_comments_notifications": false,
+      "tagged_on": "2026-11-19T05:22:47+00:00",
+      "railcar": {
+        "railcar": "EXAMPLErailcar",
+        "fetch_algo": "read:related:posts:global/2",
+        "fetch_position": 0,
+        "rec_blog_id": 2002,
+        "rec_post_id": 1003,
+        "fetch_query": "blog_id:2001,post_id:1001"
+      }
+    }
+  ]
+}

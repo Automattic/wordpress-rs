@@ -35,6 +35,8 @@ import uniffi.wp_api.parseAuthorizationUrl
 import uniffi.wp_api.wordpressComOauth2Configuration
 import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.AccountRepository
+import java.io.File
+import java.nio.file.Files
 
 class WelcomeActivity : ComponentActivity() {
     private val accountRepository: AccountRepository by inject()
@@ -66,7 +68,7 @@ class WelcomeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         if (savedInstanceState == null) {
-            signInToWpComFromLaunchExtraIfNeeded()
+            signInToWpComFromTokenFileIfNeeded()
         }
 
         val wpComAuth = if (WpComCredentials.CLIENT_ID != null && WpComCredentials.CLIENT_SECRET != null) {
@@ -81,15 +83,20 @@ class WelcomeActivity : ComponentActivity() {
     }
 
     /**
-     * Stores the `wpcom-token` launch extra as the WordPress.com account, unless one is already signed in. Lets
-     * an emulator be signed in without the OAuth flow – see `scripts/example-app-signin.sh`.
+     * Stores the token in the app's `files/wpcom-token` as the WordPress.com account, unless one is already signed
+     * in, and deletes the file. Lets an emulator be signed in without the OAuth flow – see
+     * `scripts/example-app-signin.sh`, which writes the file from standard input so that the token is on no command
+     * line, where `ps` and the log would show it.
      *
-     * Only called on a fresh `onCreate`, so it runs at most once per launch – signing out doesn't immediately sign
-     * the account back in with the still-present extra.
+     * Only called on a fresh `onCreate`, and the file is deleted first, so it runs at most once per sign-in –
+     * signing out doesn't sign the account back in.
      */
-    private fun signInToWpComFromLaunchExtraIfNeeded() {
-        val token = intent.getStringExtra(WPCOM_TOKEN_EXTRA)?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        intent.removeExtra(WPCOM_TOKEN_EXTRA)
+    private fun signInToWpComFromTokenFileIfNeeded() {
+        val file = File(filesDir, WPCOM_TOKEN_FILE)
+        if (!file.exists()) return
+        val token = file.readText().trim()
+        Files.delete(file.toPath())
+        if (token.isEmpty()) return
 
         val hasWpComAccount = accountRepository.all().any { it is Account.WpCom && it.siteApiRoot.isEmpty() }
         if (hasWpComAccount) return
@@ -332,7 +339,7 @@ class WelcomeActivity : ComponentActivity() {
     companion object {
         private const val SELF_HOSTED_REDIRECT_URI = "wordpressrsexample://authorized"
         private const val WPCOM_REDIRECT_URI = "wordpressrsexample://wpcom-authorized"
-        private const val WPCOM_TOKEN_EXTRA = "wpcom-token"
+        private const val WPCOM_TOKEN_FILE = "wpcom-token"
     }
 }
 

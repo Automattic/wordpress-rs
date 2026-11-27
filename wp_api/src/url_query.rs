@@ -102,6 +102,7 @@ impl_as_query_value_from_to_string!(u32);
 impl_as_query_value_from_to_string!(u64);
 impl_as_query_value_from_to_string!(i32);
 impl_as_query_value_from_to_string!(i64);
+impl_as_query_value_from_to_string!(f64);
 impl_as_query_value_from_to_string!(bool);
 
 impl AsQueryValue for &str {

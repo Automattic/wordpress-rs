@@ -1,0 +1,10 @@
+{
+  "success": true,
+  "subscribed": true,
+  "subscription": {
+    "blog_ID": "100000001",
+    "delivery_frequency": "daily",
+    "status": "active",
+    "ts": "2026-11-19 07:14:48"
+  }
+}

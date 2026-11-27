@@ -14,6 +14,10 @@
 //! says what the server has. Then it's sent again if it's still needed, which is safe because
 //! saving and unsaving are idempotent.
 //!
+//! A reader who isn't signed in to WordPress.com has saved posts too, kept on this device only:
+//! nothing is sent, and every save reads as pending. When they sign in, the account's service takes
+//! them over with [`ReaderSavedService::adopt_signed_out_saves`].
+//!
 //! Known limits:
 //!
 //! - A request in doubt that the server applies after a newer opposite tap was answered undoes that
@@ -34,8 +38,10 @@ use futures::lock::Mutex as AsyncMutex;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+use wp_api::auth::WpAuthenticationProvider;
 use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::{RequestExecutionErrorReason, WpApiClientDelegate, WpApiError, WpErrorCode};
+use wp_api::request::RequestExecutor;
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_posts::ReaderPost;
@@ -49,11 +55,15 @@ use wp_mobile_cache::db_types::reader::{
 };
 use wp_mobile_cache::repository::QueryExecutor;
 use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderSavedRepository};
-use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
+use wp_mobile_cache::repository::wordpress_com_accounts::{
+    ReaderOwner, WordPressComAccountRepository,
+};
 use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 
+mod offline;
 mod storage;
 
+pub use offline::{ReaderOfflineImage, ReaderOfflinePost, ReaderOfflineReport, ReaderOfflineState};
 pub use storage::{
     ReaderLocalSave, ReaderSavedImportReport, ReaderSavedListInfo, ReaderSavedListItem,
     ReaderSavedPageResult, ReaderSavedPostsCollection,
@@ -94,8 +104,24 @@ pub enum ReaderSavedError {
     #[error("The server's results don't match the posts sent to it.")]
     UnmatchedImportResults,
 
+    /// A saved post's image couldn't be written to, or deleted from, the directory given to
+    /// [`ReaderSavedService::set_offline_image_store`].
+    #[error("{reason}")]
+    OfflineFiles { reason: String },
+
+    /// The server couldn't be reached to fetch a saved post's content.
+    #[error("{reason}")]
+    OfflineUnreachable { reason: String },
+
     #[error("{0}")]
     Database(SqliteDbError),
+}
+
+/// What a saved posts error says, in words, for an app to show. Swift and Kotlin get an error's
+/// case and its fields, and not the sentence that goes with it.
+#[uniffi::export]
+pub fn reader_saved_error_message(error: &ReaderSavedError) -> String {
+    error.to_string()
 }
 
 impl From<WpApiError> for ReaderSavedError {
@@ -143,7 +169,8 @@ pub trait ReaderSavedObserver: Send + Sync {
 /// relaunch, and one the server hasn't got yet is sent by a later call. Call [`Self::sync`] at
 /// launch, when the app comes to the foreground, and when the device comes back online.
 ///
-/// [`WpApiCache::remove_wordpress_com_account`] deletes it all.
+/// [`WpApiCache::remove_wordpress_com_account`] deletes it all, except the stored image files: see
+/// [`Self::remove_offline_images`].
 ///
 /// Create one per account and share it: it sends one request at a time, and a second instance
 /// would send alongside it.
@@ -154,6 +181,8 @@ pub struct ReaderSavedService {
     cache: Arc<WpApiCache>,
     /// The account's row in the cache.
     account: RowId,
+    /// The reader isn't signed in, so saves stay on this device and nothing is sent.
+    signed_out: bool,
     observer: Mutex<Option<Arc<dyn ReaderSavedObserver>>>,
     /// Held by everything that uses the network, so it happens one thing at a time.
     lane: AsyncMutex<()>,
@@ -165,6 +194,12 @@ pub struct ReaderSavedService {
     refusals: Mutex<Vec<(Vec<RowId>, Refusal)>>,
     /// The rows taps are waiting on, and how many taps wait on each.
     waiting: Mutex<HashMap<RowId, usize>>,
+    /// Fetches saved posts' images, which aren't API requests.
+    request_executor: Arc<dyn RequestExecutor>,
+    /// The account's authorization, for a private site's images.
+    auth_provider: Arc<WpAuthenticationProvider>,
+    /// Where saved posts' images are kept, once the app has said.
+    image_store: Mutex<Option<offline::ImageStore>>,
     clock: Clock,
 }
 
@@ -181,6 +216,28 @@ impl ReaderSavedService {
         user_id: WpComUserId,
     ) -> Result<Self, ReaderSavedError> {
         Self::with_clock(delegate, source, cache, user_id, Arc::new(SystemTime::now))
+    }
+
+    /// Like [`Self::new`], for any reader.
+    ///
+    /// For [`ReaderOwner::SignedOut`], saves are kept on this device only. Nothing is sent, a save
+    /// or unsave returns [`ReaderSavedOutcome::Pending`], and [`Self::sync`] and the saved list's
+    /// refresh do nothing. Save with [`Self::save_with_details`], because no server list will
+    /// fill in the post later.
+    #[uniffi::constructor]
+    pub fn for_reader(
+        delegate: WpApiClientDelegate,
+        source: ReaderSavedSource,
+        cache: Arc<WpApiCache>,
+        owner: ReaderOwner,
+    ) -> Result<Self, ReaderSavedError> {
+        Ok(Self::for_reader_with_clock(
+            delegate,
+            source,
+            cache,
+            owner,
+            Arc::new(SystemTime::now),
+        )?)
     }
 
     pub fn set_observer(&self, observer: Option<Arc<dyn ReaderSavedObserver>>) {
@@ -209,6 +266,14 @@ impl ReaderSavedService {
         Ok(self.cache.execute(|connection| {
             ReaderSavedRepository::count_waiting_for_room(connection, self.account)
         })?)
+    }
+
+    /// How many saves and unsaves the server doesn't have yet: the ones waiting to be sent, and
+    /// the saves waiting for room. A signed-out reader's saves all count: no server has them.
+    pub fn pending_count(&self) -> Result<u64, ReaderSavedError> {
+        Ok(self
+            .cache
+            .execute(|connection| ReaderSavedRepository::count_pending(connection, self.account))?)
     }
 
     /// Saves a post. It reads as saved, and shows in the saved list, straight away.
@@ -289,6 +354,9 @@ impl ReaderSavedService {
     /// Returns [`ReaderSavedError::TooManySaves`] after doing all that if saves are still waiting
     /// for room under the account's save cap.
     pub async fn sync(&self) -> Result<(), ReaderSavedError> {
+        if self.signed_out {
+            return Ok(());
+        }
         let _lane = self.lane.lock().await;
         self.sync_in_lane().await?;
         if self.saves_waiting_for_room()? > 0 {
@@ -306,14 +374,44 @@ impl ReaderSavedService {
         user_id: WpComUserId,
         clock: Clock,
     ) -> Result<Self, ReaderSavedError> {
+        Ok(Self::for_reader_with_clock(
+            delegate,
+            source,
+            cache,
+            ReaderOwner::Account { user_id },
+            clock,
+        )?)
+    }
+
+    pub(crate) fn for_reader_with_clock(
+        delegate: WpApiClientDelegate,
+        source: ReaderSavedSource,
+        cache: Arc<WpApiCache>,
+        owner: ReaderOwner,
+        clock: Clock,
+    ) -> Result<Self, SqliteDbError> {
+        let signed_out = owner == ReaderOwner::SignedOut;
         let account = cache.execute(|connection| {
-            WordPressComAccountRepository::get_or_create(connection, user_id)
+            let account = WordPressComAccountRepository::get_or_create_owner(connection, owner)?;
+            // No server counts a signed-out reader's saves, so the count starts from none.
+            if signed_out
+                && ReaderSavedRepository::select_state(connection, account)?
+                    .total
+                    .is_none()
+            {
+                ReaderSavedRepository::set_total(connection, account, 0)?;
+            }
+            Ok::<_, SqliteDbError>(account)
         })?;
         Ok(Self {
+            request_executor: delegate.request_executor.clone(),
+            auth_provider: delegate.auth_provider.clone(),
+            image_store: Mutex::default(),
             client: WpComApiClient::new(delegate),
             source,
             cache,
             account,
+            signed_out,
             observer: Mutex::default(),
             lane: AsyncMutex::new(()),
             page_details: Mutex::default(),
@@ -341,7 +439,7 @@ impl ReaderSavedService {
         })?;
         Ok(if rows.iter().any(|row| row.saved) {
             ReaderSavedStatus::Saved
-        } else if state.keys_refreshed || !rows.is_empty() {
+        } else if state.keys_refreshed || !rows.is_empty() || self.signed_out {
             ReaderSavedStatus::NotSaved
         } else {
             ReaderSavedStatus::Unknown
@@ -422,6 +520,10 @@ impl ReaderSavedService {
             transaction.commit().map_err(SqliteDbError::from)?;
             Ok::<_, SqliteDbError>(row)
         })?;
+        if self.signed_out {
+            self.notify();
+            return Ok(signed_out_outcome(true));
+        }
         self.forget_refusals(&[row]);
         let _waiting = Waiting::new(self, vec![row]);
         self.notify();
@@ -451,9 +553,18 @@ impl ReaderSavedService {
         let waiting = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             let rows = ReaderSavedRepository::tap_unsave(&transaction, self.account, &keys)?;
+            if self.signed_out {
+                // No server has these saves, so an unsaved row has nothing left to say.
+                ReaderSavedRepository::delete_unsaved(&transaction, self.account)?;
+            }
             transaction.commit().map_err(SqliteDbError::from)?;
             Ok::<_, SqliteDbError>(rows)
         })?;
+        if self.signed_out {
+            self.notify();
+            self.remove_files_of_unsaved_posts()?;
+            return Ok(signed_out_outcome(false));
+        }
         self.forget_refusals(&waiting);
         let _waiting = Waiting::new(self, waiting.clone());
         self.notify();
@@ -464,21 +575,22 @@ impl ReaderSavedService {
             return Err(error);
         }
         let rows = self.rows_for(&keys)?;
-        Ok(
-            match rows
-                .iter()
-                .find(|row| row.is_pending() || row.tapped || row.saved)
-            {
-                Some(row) if !row.saved => sent.pending_reason(row),
-                // A save tapped since decides.
-                Some(row) => ReaderSavedOutcome::Synced {
-                    key: row.key.clone(),
-                },
-                None => ReaderSavedOutcome::Synced {
-                    key: rows.first().map_or(keys[0].clone(), |row| row.key.clone()),
-                },
+        let outcome = match rows
+            .iter()
+            .find(|row| row.is_pending() || row.tapped || row.saved)
+        {
+            Some(row) if !row.saved => sent.pending_reason(row),
+            // A save tapped since decides.
+            Some(row) => ReaderSavedOutcome::Synced {
+                key: row.key.clone(),
             },
-        )
+            None => ReaderSavedOutcome::Synced {
+                key: rows.first().map_or(keys[0].clone(), |row| row.key.clone()),
+            },
+        };
+        // An unsaved post's images go with it. A refused unsave returned above, with them kept.
+        self.remove_files_of_unsaved_posts()?;
+        Ok(outcome)
     }
 
     fn rows_for(&self, keys: &[ReaderSavedKey]) -> Result<Vec<DbReaderSavedRow>, ReaderSavedError> {
@@ -490,6 +602,9 @@ impl ReaderSavedService {
     /// Sends pending rows, then reads the saved keys, then sends what that shows is still needed.
     /// Call it holding the lane.
     async fn sync_in_lane(&self) -> Result<(), ReaderSavedError> {
+        if self.signed_out {
+            return Ok(());
+        }
         let sent = self.send_pending().await?;
         sent.log();
         // A full account was asked once already: the keys don't make room.
@@ -537,6 +652,9 @@ impl ReaderSavedService {
     /// [`Self::send_pending`], knowing `room` already.
     async fn send_pending_from(&self, mut room: Room) -> Result<Sent, ReaderSavedError> {
         let mut sent = Sent::default();
+        if self.signed_out {
+            return Ok(sent);
+        }
         let mut sends: HashMap<RowId, u32> = HashMap::new();
         loop {
             sent.room = room;
@@ -988,6 +1106,18 @@ impl Sent {
         if let Some(error) = &self.unexpected {
             log::warn!("{error}");
         }
+    }
+}
+
+/// What becomes of a signed-out reader's save or unsave: it only happens on this device.
+fn signed_out_outcome(saved: bool) -> ReaderSavedOutcome {
+    let reason = if saved {
+        "It's kept on this device until you sign in to WordPress.com."
+    } else {
+        "It's removed from this device. Nothing was sent: you aren't signed in to WordPress.com."
+    };
+    ReaderSavedOutcome::Pending {
+        reason: reason.to_string(),
     }
 }
 

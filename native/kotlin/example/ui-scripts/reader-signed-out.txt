@@ -1,0 +1,54 @@
+// The Reader's screens, as the reader who isn't signed in. Nothing here changes an account: the tag it follows
+// stays on the device, and it unfollows it again.
+//
+// Run it with scripts/example-app-adb-script.py, which lists the steps.
+
+start
+wait 2
+tap Reader (signed out)
+wait 6
+shot 01-home
+// A tag, followed on this device only, and unfollowed again.
+tap Follow tag art-design
+wait 3
+shot 02-tag-followed
+tap Unfollow tag art-design
+wait 2
+// Discover can open with a card of sites that fills the screen, so the first post is scrolled to.
+tap Discover
+waitfor #reader_stream_status 40
+wait 4
+shot 03-discover
+tap 0:#reader_post
+wait 6
+shot 04-post
+back
+back
+tap Freshly Pressed
+waitfor #reader_post 40
+down 6
+shot 05-freshly-pressed-scrolled
+back
+tap First Posts
+wait 8
+shot 06-first-posts
+back
+tap Saved posts
+wait 3
+shot 07-saved
+back
+tap Offline reading
+wait 3
+shot 08-offline
+back
+tap Subscriptions
+wait 4
+shot 09-subscriptions
+back
+tap Blocked sites
+wait 4
+shot 10-blocked-sites
+back
+tap Find sites
+wait 3
+shot 11-find-sites

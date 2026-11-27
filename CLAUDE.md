@@ -90,6 +90,7 @@ Test credentials are configured in:
 ## Important Files
 
 - `CONVENTIONS.md` - Rules for modelling API responses; read before adding types
+- `Documentation/adding-a-wordpress-com-endpoint.md` - How to add a WordPress.com (`rest/v1.x`, `wpcom/v2`) endpoint
 - `Makefile` - Build automation and platform-specific targets
 - `wp_api/src/lib.rs` - Main library entry point
 - `wp_api/src/request.rs` - Core request/response handling

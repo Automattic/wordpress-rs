@@ -6,6 +6,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttp
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -15,11 +16,14 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.CloudflareErrorKind
 import uniffi.wp_api.MediaCreateParams
+import uniffi.wp_api.ReaderPageView
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.defaultUserAgent
+import uniffi.wp_api.readerPageViewRequest
 import java.io.File
 import java.io.IOException
 import java.net.NoRouteToHostException
@@ -544,6 +548,69 @@ class WpRequestExecutorTest {
         assertEquals("Bearer tökén", mockWebServer.takeRequest().getHeader("Authorization"))
         assertIs<WpRequestResult.WpError<*>>(result)
         assertIs<WpErrorCode.Unauthorized>((result as WpRequestResult.WpError<*>).errorCode)
+    }
+
+    /**
+     * A Reader page view is sent with the app's `User-Agent`: a site's stats don't count a view sent
+     * with the library's.
+     */
+    @Test
+    fun `a request that names its own User-Agent is sent with only that one`() = runTest {
+        val appUserAgent = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Mobile wp-android/26.4"
+        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+        val pageView = assertNotNull(
+            readerPageViewRequest(
+                ReaderPageView(
+                    siteId = 3584907uL,
+                    postId = 1L,
+                    siteUrl = "https://en.blog.wordpress.com",
+                    siteIsPrivate = false,
+                    userAgent = appUserAgent
+                )
+            )
+        )
+        // Header names reach the executor in lower case, so this also covers a name in another case
+        // than `User-Agent`.
+        assertEquals(listOf(appUserAgent), pageView.headerMap().toMap()["user-agent"])
+
+        // The view goes to WordPress.com's pixel; send it to the mock server instead.
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                chain.proceed(chain.request().newBuilder().url(mockWebServer.url("/g.gif")).build())
+            }
+            .build()
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(client),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+
+        executor.execute(pageView)
+
+        assertEquals(listOf(appUserAgent), mockWebServer.takeRequest().headers.values("User-Agent"))
+    }
+
+    @Test
+    fun `a request that names no User-Agent is sent with only the library's`() = runTest {
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertEquals(
+            listOf(defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")),
+            mockWebServer.takeRequest().headers.values("User-Agent")
+        )
     }
 
     /**

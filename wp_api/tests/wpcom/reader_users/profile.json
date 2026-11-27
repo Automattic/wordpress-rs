@@ -1,0 +1,20 @@
+{
+  "ID": 5001,
+  "user_login": "example",
+  "first_name": "Example",
+  "last_name": "Name",
+  "display_name": "Example Name",
+  "nice_name": "example",
+  "description": "An example description.",
+  "avatar_URL": "https://example.com/avatar.png",
+  "profile_URL": "https://example.com/example-author",
+  "primary_blog": {
+    "ID": 2001,
+    "feed_ID": 3001,
+    "URL": "https://example.wordpress.com",
+    "title": "Example Site",
+    "description": "An example site.",
+    "avatar_URL": "https://example.com/icon.png"
+  },
+  "recommended_blogs_count": 0
+}

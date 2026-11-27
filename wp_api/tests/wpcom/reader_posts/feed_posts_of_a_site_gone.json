@@ -1,0 +1,157 @@
+{
+  "date_range": {
+    "before": "2026-11-20T12:00:00+00:00",
+    "after": "2026-11-20T09:00:00+00:00"
+  },
+  "number": 2,
+  "posts": [
+    {
+      "ID": 0,
+      "author": {
+        "ID": 0,
+        "email": "",
+        "nice_name": "",
+        "name": "A Writer",
+        "URL": "",
+        "avatar_URL": "",
+        "has_avatar": false,
+        "profile_URL": ""
+      },
+      "date": "2026-11-20T12:00:00+00:00",
+      "modified": "2026-11-20T12:00:00+00:00",
+      "title": "A story from the feed",
+      "URL": "https://example.com/a-story-from-the-feed/",
+      "short_URL": "https://example.com/a-story-from-the-feed/",
+      "content": "<p>The text of a story from the feed.</p>",
+      "excerpt": "The text of a story from the feed.",
+      "slug": "",
+      "status": "",
+      "password": "",
+      "parent": false,
+      "type": "",
+      "discussion": {
+        "comments_open": false,
+        "comment_status": "closed",
+        "pings_open": false,
+        "ping_status": "closed",
+        "comment_count": 0
+      },
+      "likes_enabled": false,
+      "like_count": 0,
+      "i_like": 0,
+      "is_reblogged": 0,
+      "is_following": false,
+      "featured_image": "",
+      "format": "standard",
+      "geo": false,
+      "publicize_URLs": {},
+      "tags": {},
+      "categories": {},
+      "attachments": {},
+      "metadata": false,
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/100000002/",
+          "site": "https://public-api.wordpress.com/rest/v1.2/read/sites/100000001"
+        },
+        "data": {
+          "feed": {
+            "errors": {
+              "unauthorized": ["User cannot access the feed of this private blog."]
+            },
+            "error_data": { "unauthorized": 403 }
+          },
+          "site": {
+            "errors": { "site_gone": ["The site has been deleted"] },
+            "error_data": { "site_gone": 410 }
+          }
+        }
+      },
+      "word_count": 8,
+      "pseudo_ID": "00000000000000000000000000000001",
+      "global_ID": "00000000000000000000000000000001",
+      "site_ID": 100000001,
+      "site_name": "Example News",
+      "site_URL": "https://example.com",
+      "site_is_private": false,
+      "featured_media": {},
+      "is_external": false,
+      "is_jetpack": false,
+      "use_excerpt": false,
+      "feed_ID": 100000002,
+      "feed_URL": "https://example.com/feed/",
+      "feed_item_ID": 100000003,
+      "views": null,
+      "is_seen": false,
+      "is_following_conversation": false
+    },
+    {
+      "ID": 0,
+      "author": {
+        "ID": 0,
+        "email": "",
+        "nice_name": "",
+        "name": "Another Writer",
+        "URL": "",
+        "avatar_URL": "",
+        "has_avatar": false,
+        "profile_URL": ""
+      },
+      "date": "2026-11-20T09:00:00+00:00",
+      "modified": "2026-11-20T09:00:00+00:00",
+      "title": "An older story from the feed",
+      "URL": "https://example.com/an-older-story-from-the-feed/",
+      "short_URL": "https://example.com/an-older-story-from-the-feed/",
+      "content": "<p>The text of an older story from the feed.</p>",
+      "excerpt": "The text of an older story from the feed.",
+      "slug": "",
+      "status": "",
+      "password": "",
+      "parent": false,
+      "type": "",
+      "discussion": {
+        "comments_open": false,
+        "comment_status": "closed",
+        "pings_open": false,
+        "ping_status": "closed",
+        "comment_count": 0
+      },
+      "likes_enabled": false,
+      "like_count": 0,
+      "i_like": 0,
+      "is_reblogged": 0,
+      "is_following": false,
+      "featured_image": "",
+      "format": "standard",
+      "geo": false,
+      "publicize_URLs": {},
+      "tags": {},
+      "categories": {},
+      "attachments": {},
+      "metadata": false,
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/100000002/",
+          "site": "https://public-api.wordpress.com/rest/v1.2/read/sites/100000001"
+        }
+      },
+      "word_count": 9,
+      "pseudo_ID": "00000000000000000000000000000002",
+      "global_ID": "00000000000000000000000000000002",
+      "site_ID": 100000001,
+      "site_name": "Example News",
+      "site_URL": "https://example.com",
+      "site_is_private": false,
+      "featured_media": {},
+      "is_external": false,
+      "is_jetpack": false,
+      "use_excerpt": false,
+      "feed_ID": 100000002,
+      "feed_URL": "https://example.com/feed/",
+      "feed_item_ID": 100000004,
+      "views": null,
+      "is_seen": false,
+      "is_following_conversation": false
+    }
+  ]
+}

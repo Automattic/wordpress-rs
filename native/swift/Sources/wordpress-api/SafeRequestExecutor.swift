@@ -612,6 +612,12 @@ extension NetworkRequestContent {
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
         request.allHTTPHeaderFields?[requestIdHeaderName] = self.requestId()
         for (name, value) in additionalHeaders {
+            // A request that names its own User-Agent keeps it. A Reader page view is sent with the app's, and
+            // a site's stats don't count one sent with the library's.
+            let isUserAgent = name.caseInsensitiveCompare("User-Agent") == .orderedSame
+            if isUserAgent, request.value(forHTTPHeaderField: name) != nil {
+                continue
+            }
             request.addValue(value, forHTTPHeaderField: name)
         }
         try self.encodeBody(into: &request)

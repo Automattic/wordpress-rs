@@ -1,0 +1,28 @@
+{
+  "blog_ID": "2001",
+  "feed_ID": "3001",
+  "blog_owner": {
+    "ID": 5001,
+    "name": "Example Name"
+  },
+  "name": "Example Feed",
+  "URL": "https://example.wordpress.com/",
+  "feed_URL": "https://example.wordpress.com",
+  "subscribers_count": 1234,
+  "is_following": true,
+  "last_update": "2026-11-17T12:54:13+00:00",
+  "last_checked": "2026-11-17T12:54:20+00:00",
+  "marked_for_refresh": false,
+  "next_refresh_time": null,
+  "organization_id": 0,
+  "subscription_id": "8001",
+  "unseen_count": 7,
+  "meta": {
+    "links": {
+      "self": "https://public-api.wordpress.com/rest/v1.1/read/feed/3001",
+      "site": "https://public-api.wordpress.com/rest/v1.1/read/sites/2001"
+    }
+  },
+  "image": "https://example.com/icon.png?w=32&amp;h=32",
+  "description": "News &amp; examples"
+}
