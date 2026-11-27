@@ -102,6 +102,13 @@ Test credentials are configured in:
 - Platform bindings are generated automatically - don't edit generated files directly
 - For URL columns in the `wp_mobile_cache` database (e.g. `self_hosted_sites.url`), compare with the `urls_eq(a, b)` scalar function rather than `=`. It compares via `ParsedUrl` parsing, so lookups tolerate trailing-slash and other URL-normalization differences.
 
+## Text in errors and outcomes
+
+- **Text that app users see belongs in this library**, so every app shows the same translated message. Return a typed error or outcome that implements `WpSupportsLocalization`, with its message in `wp_localization/localization/en-US/main.ftl`, as `WpApiError` does. Swift gets the message as `errorDescription`, and Kotlin as `localizedDescription()`, with no work in either app.
+- **Never return a user-facing sentence as a plain `String`.** It shows in English in every language.
+- **Write it for the user:** what happened, and what to do next, in the words the apps' screens use ("follow this conversation", not "your subscription to the post's comments"). Don't make the server the subject.
+- **`#[error]` and `Display` text is for app developers.** It names the operation and the value that was wrong. Don't call the thing that failed "this" or "it".
+
 ## PR Description Format
 
 When writing PR descriptions, use the template in `.github/PULL_REQUEST_TEMPLATE.md` as the base format.
