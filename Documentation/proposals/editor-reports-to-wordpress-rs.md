@@ -7,7 +7,7 @@ While the editor is open, it reads and saves the post itself. When the user save
 The editor reports what it does to the app. It reports every change to the post, and every request it sends for the post with the response or failure that came back. The app passes each report to wordpress-rs, which records it:
 
 1. a change becomes a new version in the history of the post's working copy;
-2. a request goes into the editor session's request log, and is completed when its response or failure is reported.
+2. a request goes into the editing session's request log, and is completed when its response or failure is reported.
 
 Information flows one way, from the editor to wordpress-rs. The one exception is opening the editor, which starts from the working copy wordpress-rs has. The editor never waits for a report to be recorded.
 
@@ -25,13 +25,13 @@ While the editor is open, only the editor sends the post to the server. Once it 
 - **Version**: the working copy's fields at one point in time. Every change adds a version, and the newest one holds the working copy's current fields. The versions together are its **history**.
 - **Parent**: the version a version was made from. Editing from an older version makes a new version whose parent is that older one.
 - **Cache**: wordpress-rs's copy of what it last learned the server has. It's a separate database from the working copies.
-- **Editor session**: one stretch of editing a post, from opening the editor to closing it. wordpress-rs records each session in its database.
-- **Request log**: the requests the editor reported during a session, each with the response or failure that came back.
-- **Push**: wordpress-rs sending a working copy to the server. It pushes only after the editor closes. While the editor is open, the editor saves the post itself.
+- **Editing session**: one stretch of work on a working copy, recorded by wordpress-rs. A session in an editor runs from opening the editor to closing it. The app's own work, such as one save from a settings screen, is a one-off session that starts and ends with it. Every version belongs to a session.
+- **Request log**: the requests sent during a session, each with who sent it, and the response or failure that came back. It holds the editor's requests and wordpress-rs's own.
+- **Push**: wordpress-rs sending a working copy to the server, in a session of its own. It pushes only after the editor closes. While the editor is open, the editor saves the post itself.
 - **Base version**: the server's `modified_gmt` for the version of the post a working copy's changes start from.
 - **Source of truth**: whichever has the current version of the post. While the editor is open, that's the editor, and the working copy follows a moment behind as reports arrive. Once the editor closes, it's the working copy.
 - **Editor protocol**: the interface between GutenbergKit and the app. It covers the reports, opening the editor with a post, and saving. GutenbergKit defines it.
-- **Session protocol**: the interface between the app and wordpress-rs. It covers the editor sessions that record the reports. wordpress-rs defines it.
+- **Session protocol**: the interface between the app and wordpress-rs. It covers the editing sessions that record the reports. wordpress-rs defines it.
 
 ## The layers
 
@@ -40,7 +40,7 @@ While the editor is open, only the editor sends the post to the server. Once it 
 | A | GutenbergKit, the editor library | The editor protocol | Nothing from wordpress-rs. |
 | B | The app: GutenbergKit's example app first, then WordPress-iOS and WordPress-Android | Nothing | Both protocols. It's the only layer that knows both. |
 | C | `wp_mobile`, wordpress-rs's business layer | The session protocol | Layer D. |
-| D | `wp_mobile_local_content`, in wordpress-rs | Storage for working copies, their history, and editor sessions | Nothing from GutenbergKit. |
+| D | `wp_mobile_local_content`, in wordpress-rs | Storage for working copies, their history, and editing sessions | Nothing from GutenbergKit. |
 
 Neither protocol knows about the other. They may look alike, but each follows its own library's conventions, and either can change without the other. The app converts between them.
 
@@ -126,7 +126,7 @@ How GutenbergKit builds these is up to GutenbergKit. These are the parts the ses
 - **The reports never wait for the app.** The editor sends a request without waiting for its report to be recorded. If the app's process ends after the request is sent but before the report is recorded, the request log is missing that report. That's accepted, since it's rare. A change report can be lost the same way, but then at most the last moment of writing is missing.
 - **Responses are the server's bytes.** wordpress-rs reads them to learn what the server has, so they mustn't be rebuilt from the editor's own types.
 
-`[decision]` Where the editor's identity comes from. wordpress-rs records who the editor makes its requests as, in a form that isn't a credential, such as a hash of the token. On iOS, with GutenbergKit's REST relay, the editor's web page doesn't hold the credential. So the identity has to come from native code, either GutenbergKit's, as part of the editor protocol, or the app's. What wordpress-rs does with the identity waits on the details of multi-user support.
+`[decision]` Where the editor's identity comes from. wordpress-rs records on the session who the editor makes its requests as, in a form that isn't a credential, such as a hash of the token. On iOS, with GutenbergKit's REST relay, the editor's web page doesn't hold the credential. So the identity has to come from native code, either GutenbergKit's, as part of the editor protocol, or the app's. What wordpress-rs does with the identity waits on the details of multi-user support.
 
 `[not designed]` How the editor combines the working copy with the server's version. wordpress-rs gives the app the working copy as the latest version of the post. The editor fetches the server's version itself, and works out the rest.
 
@@ -135,8 +135,8 @@ How GutenbergKit builds these is up to GutenbergKit. These are the parts the ses
 The app implements the editor protocol's listener by calling the session protocol, and converts between the two libraries' types.
 
 ```kotlin
-// Opening a post starts an editor session.
-val session = postEditorService.openPost(postId = postId, editorIdentity = identity)
+// Opening a post starts an editing session in the editor.
+val session = postEditorService.openPost(postId = postId, editorName = "GutenbergKit", identity = identity)
 val editorPost = session.editorPost()      // the working copy, as the latest post
 val gutenbergView = GutenbergView(configuration.withPost(editorPost), /* ... */)
 
@@ -162,21 +162,24 @@ override fun onEditorClosed() = session.end()
 
 ## C. The session protocol
 
-`wp_mobile` already has [`LocalContentService`](https://github.com/Automattic/wordpress-rs/blob/e6d2a8d85d06427d31a2b4f9e2468c4811c037be/wp_mobile/src/service/local_content.rs#L15-L35), which stores working copies and never talks to the server. The proposal adds `PostEditorService` beside it. Opening a post returns a `PostEditorSession`, which records the editor's reports.
+`wp_mobile` already has [`LocalContentService`](https://github.com/Automattic/wordpress-rs/blob/e6d2a8d85d06427d31a2b4f9e2468c4811c037be/wp_mobile/src/service/local_content.rs#L15-L35), which stores working copies and never talks to the server. The app creates it once, with the name of the client using it, such as the app or one of its extensions. Every session it opens is recorded as that client's.
+
+The proposal adds `PostEditorService` beside it. Opening a post returns a `PostEditorSession`, which records the editor's reports.
 
 ```rust
 impl PostEditorService {
-    /// Start an editor session for a post from the server. Uses the post's
-    /// working copy if it has one, otherwise creates one from the post in the
-    /// cache, fetching it if needed. `editor_identity` is recorded on the
-    /// session as given.
-    pub async fn open_post(&self, post_id: PostId, editor_identity: Option<String>) -> Result<PostEditorSession>;
+    /// Start an editing session for a post from the server, in the editor
+    /// named `editor_name`. Uses the post's working copy if it has one,
+    /// otherwise creates one from the post in the cache, fetching it if
+    /// needed. `identity` is recorded on the session as given.
+    pub async fn open_post(&self, post_id: PostId, editor_name: Option<String>, identity: Option<String>) -> Result<PostEditorSession>;
 
-    /// Start an editor session for a new post: a working copy with no remote post.
-    pub fn open_new_post(&self, editor_identity: Option<String>) -> Result<PostEditorSession>;
+    /// Start an editing session for a new post: a working copy with no remote post.
+    pub fn open_new_post(&self, editor_name: Option<String>, identity: Option<String>) -> Result<PostEditorSession>;
 
-    /// The sessions that didn't end normally, such as when the app crashed.
-    pub fn read_unfinished_sessions(&self) -> Result<Vec<EditorSession>>;
+    /// Push a working copy after the editor closes, in a one-off session
+    /// named `push`, so its requests are logged.
+    pub async fn push_working_copy(&self, id: WorkingCopyId) -> Result<ServerResponse>;
 }
 
 impl PostEditorSession {
@@ -188,8 +191,8 @@ impl PostEditorSession {
     /// version of the working copy.
     pub async fn record_change(&self, post: Json) -> Result<()>;
 
-    /// Record a request the editor sent in the request log.
-    pub async fn record_request_sent(&self, request: EditorRequest) -> Result<()> {
+    /// Record a request the editor sent in the request log, as the editor's.
+    pub async fn record_request_sent(&self, request: SessionRequest) -> Result<()> {
         self.log.record_sent(&request)?;
         // [decision] A request that writes the post holds exactly what the
         // editor is sending, so it's also recorded as a version. Change
@@ -201,7 +204,7 @@ impl PostEditorSession {
     }
 
     /// Complete a request's log entry with its response.
-    pub async fn record_request_response(&self, request_id: String, response: EditorResponse) -> Result<()> {
+    pub async fn record_request_response(&self, request_id: String, response: SessionResponse) -> Result<()> {
         let request = self.log.record_response(&request_id, &response)?;
         // Only a successful response holding the session's whole post: a
         // read without `_fields`, a create, or an update.
@@ -232,11 +235,13 @@ impl PostEditorSession {
 
 A session records one report at a time, in the order they arrive, so the history and the request log follow the editor's order.
 
+`[decision]` The fetch that creates a working copy, when `open_post` finds none, isn't logged. A session can't exist before its working copy.
+
 ## D. Storage
 
-Local content storage ([wordpress-rs#1682](https://github.com/Automattic/wordpress-rs/pull/1682)) has the [working copy types](https://github.com/Automattic/wordpress-rs/blob/e6d2a8d85d06427d31a2b4f9e2468c4811c037be/wp_mobile_local_content/src/db_types/working_copy.rs#L132) and their database. The proposal changes how a working copy is stored, and adds editor sessions.
+Local content storage ([wordpress-rs#1682](https://github.com/Automattic/wordpress-rs/pull/1682)) has the [working copy types](https://github.com/Automattic/wordpress-rs/blob/e6d2a8d85d06427d31a2b4f9e2468c4811c037be/wp_mobile_local_content/src/db_types/working_copy.rs#L132) and their database. The proposal changes how a working copy is stored, and adds editing sessions.
 
-**A working copy is an ID with a history.** Saving a working copy adds a version made from the newest one. Saving the fields it already has adds nothing.
+**A working copy is an ID with a history.** Saving a working copy adds a version made from the newest one, recorded in the session the save was made in. A save outside any session, and creating a working copy, each get a one-off session. Saving the fields it already has adds nothing, not even a session.
 
 To keep the history small, the content is stored apart from the other fields. A version refers to one content row and one row of the other fields. When only the title changes, the new version reuses its parent's content row. When only the content changes, it reuses its parent's other fields.
 
@@ -245,8 +250,7 @@ pub struct WorkingCopyVersion {
     pub id: WorkingCopyVersionId,
     /// `None` for the working copy's first version.
     pub parent: Option<WorkingCopyVersionId>,
-    /// `None` when the version was saved outside an editor session.
-    pub editor_session_id: Option<EditorSessionId>,
+    pub session_id: EditingSessionId,
     pub created_at: String,
 }
 
@@ -254,35 +258,57 @@ pub fn read_working_copy_versions(&self, id: WorkingCopyId) -> Result<Vec<Workin
 pub fn read_post_working_copy_version(&self, id: WorkingCopyVersionId) -> Result<Option<PostWorkingCopyFields>>;
 ```
 
-`[not designed]` Thinning the history. Thinning removes the oldest versions first, once the history is over a size limit or older than an age limit. The user can change both limits. Removing a version means giving its children another parent first. The newest version is never removed, since it holds the user's current content.
+`[not designed]` Thinning the history. The session is the unit: thinning removes the oldest sessions first, each with its versions and its request log, once the history is over a size limit or older than an age limit. The user can change both limits. A version whose parent goes with a removed session takes the nearest remaining ancestor as its parent, or none. The session holding the newest version is never removed, since it holds the user's current content. So a working copy edited in one long session can't be thinned, and the size limit is a target, not a guarantee. The request log counts against the size limit, since a save's response holds the whole post.
 
 `[not designed]` Using the history, such as going back to an older version and editing from it.
 
 **Fields a working copy doesn't model.** Plugins can add their own fields to a post, as post meta or as top-level fields of their own. The working copy stores both as JSON, as the cache does, and pushes them as they are. wordpress-rs can say which key changed, but not what its value means.
 
-**Editor sessions.** One record per session, stored with the working copies, so clearing the cache never removes it.
+**Editing sessions.** One record per session, stored with the working copies, so clearing the cache never removes it. A session holds only facts: what it was, who opened it, and what happened to it. Whether it's open is worked out from those facts.
 
 ```rust
-pub struct EditorSession {
-    pub id: EditorSessionId,
+pub struct EditingSession {
+    pub id: EditingSessionId,
     pub working_copy_id: WorkingCopyId,
-    /// Who the editor makes its requests as, recorded as given. Nothing uses
+    /// Where the work happened.
+    pub source: ActivitySource,
+    /// The client that opened it, as `LocalContentService` was given.
+    pub client: String,
+    /// Who the session makes its requests as, recorded as given. Nothing uses
     /// it yet.
-    pub editor_identity: Option<String>,
+    pub identity: Option<String>,
     pub started_at: WpGmtDateTime,
     /// When a change was last recorded.
     pub last_recorded_at: Option<WpGmtDateTime>,
-    /// Set when the session ends normally. A session without it didn't.
-    pub ended_at: Option<WpGmtDateTime>,
+    /// `None` while the session is open.
+    pub end: Option<SessionEnd>,
 }
 
-pub struct EditorRequestRecord {
-    pub request: EditorRequest,
+/// An editor or the app, each with an optional name, such as
+/// `Editor { name: "GutenbergKit" }` or `App { name: "post-settings" }`.
+pub enum ActivitySource {
+    Editor { name: Option<String> },
+    App { name: Option<String> },
+}
+
+pub enum SessionEnd {
+    Normal { at: WpGmtDateTime },
+    /// A later run of the client found the session not ended. The work
+    /// stopped at `last_recorded_at` at the latest.
+    Abandoned { noticed_at: WpGmtDateTime },
+}
+
+pub struct SessionRequestRecord {
+    /// Who sent it: the editor, or wordpress-rs for the app.
+    pub source: ActivitySource,
+    pub request: SessionRequest,
     pub sent_at: WpGmtDateTime,
     /// `None` when no response or failure was recorded for it.
-    pub outcome: Option<EditorRequestOutcome>,   // Response { .. } or Failure { .. }
+    pub outcome: Option<SessionRequestOutcome>,   // Response { .. } or Failure { .. }
 }
 ```
+
+Each session also records the run of the process that opened it, so wordpress-rs can tell a session left open by an earlier run from one open now.
 
 The request log never stores a credential. Headers that carry one, such as `authorization` and `cookie`, are left out of every stored request and response.
 
@@ -290,19 +316,31 @@ The request log never stores a credential. Headers that carry one, such as `auth
 
 ### New posts
 
-Opening a new post creates its working copy and its editor session straight away. The editor creates the post on the server when it first saves it. The reported create links the working copy to the new post, so from then on the working copy has the post's server ID.
+Opening a new post creates its working copy and its editing session straight away. The editor creates the post on the server when it first saves it. The reported create links the working copy to the new post, so from then on the working copy has the post's server ID.
 
 `[not designed]` How the editor moves to the new post's ID. Inside Gutenberg, the post's ID is the key it stores the post under, so it has to move the post to the new key with its unsaved edits. Editor-driven saving plans this as `adoptPost` ([CMM-2564](https://linear.app/a8c/issue/CMM-2564/let-the-host-hand-a-newly-created-post-id-to-the-editor)), which also has to clear the undo history ([CMM-2742](https://linear.app/a8c/issue/CMM-2742/clear-the-undo-history-when-the-editor-adopts-a-new-post-id)).
 
 ### A session that didn't end normally
 
-A session that ends normally records when it ended. One that doesn't, because the app crashed or the system ended it in the background, is still unfinished the next time the app runs. Everything it recorded is still there: the working copy's versions up to `last_recorded_at`, and the request log. A request with no outcome is one whose response nobody recorded.
+A session that ends normally records when it ended. One that doesn't, because the app crashed or the system ended it in the background, stays open until the app says otherwise. Once it has started, the app calls:
 
-`[decision]` What the app does with an unfinished session: reopen the editor, offer to reopen it, or leave the working copy for the post list.
+```rust
+impl LocalContentService {
+    /// Record every session this client opened in an earlier run that never
+    /// ended as abandoned, and return them.
+    pub fn record_abandoned_sessions(&self) -> Result<Vec<EditingSession>>;
+}
+```
+
+The name says what it changes, so it's hard to call by accident. It only touches the sessions of the client the service was created for, so an app extension's open session is left alone. Sessions opened in the current run are left alone too, whenever it's called. Afterwards, every session from an earlier run has an end.
+
+Everything an abandoned session recorded is still there: its versions up to `last_recorded_at`, and its request log. A request with no outcome is one whose response nobody recorded. An abandoned editor session is where an unanswered save is most likely.
+
+`[decision]` What the app does with the abandoned sessions: offer to reopen the editor, record it in analytics, try to push, or nothing. wordpress-rs provides the facts, and each app decides.
 
 ### Pushing after the editor closes
 
-`[not designed]` When and how wordpress-rs pushes a working copy after the editor closes, including after a session that didn't end normally.
+`[not designed]` When and how wordpress-rs pushes a working copy after the editor closes, including after an abandoned session. Each push is a one-off session of its own, so its requests are logged like the editor's.
 
 Plugins' save hooks don't run for these pushes, because the editor isn't involved.
 
@@ -314,8 +352,8 @@ The editor makes these requests itself. They're below the post's path, so they'r
 
 The proof of concept is on the `editor-reports` branches of wordpress-rs and GutenbergKit.
 
-- wordpress-rs builds layers C and D for posts: the session protocol, the history, and the request log. Pushing after the editor closes is a placeholder. It fetches the post first, sends only the fields that changed, and sends nothing when the server and the working copy both changed.
-- GutenbergKit has temporary stand-ins for the editor protocol, in JavaScript and in the iOS library, for the example app to use until GutenbergKit builds the real one. The iOS example app opens posts in an editor session.
+- wordpress-rs builds layers C and D for posts: the session protocol, editing sessions and how they end, the history, and the request log. Thinning isn't built. Pushing after the editor closes is a placeholder. It fetches the post first, sends only the fields that changed, and sends nothing when the server and the working copy both changed.
+- GutenbergKit has temporary stand-ins for the editor protocol, in JavaScript and in the iOS library, for the example app to use until GutenbergKit builds the real one. The iOS example app opens posts in an editing session.
 
 It leaves out:
 
@@ -335,6 +373,9 @@ In unit tests, against a scripted server:
 
 - The cache isn't updated by a response that's older than the cached post, holds only some of its fields, has an error status, or is for another post.
 - Credential headers aren't stored.
+- Recording abandoned sessions ends only the client's sessions from an earlier run, and returns them.
+- Deleting a session deletes its versions and its requests.
+- A push after the editor closes logs its fetch and its update, with their responses, in its own session.
 
 Not tried yet:
 
