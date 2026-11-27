@@ -42,11 +42,11 @@ val RequestExecutionErrorReason.isSiteUnreachable: Boolean
  * Distinct from [isSiteUnreachable]: the site itself may be perfectly healthy.
  *
  * This is only reported when the [NetworkAvailabilityProvider] supplied to the
- * executor reports the device offline at the moment a DNS lookup fails. It is
- * therefore best-effort: with no real provider wired in (the default reports the
- * device as always available) this never returns `true`, and a device that drops
- * offline mid-request — surfacing as a connect or timeout error rather than a DNS
- * failure — is not detected here either.
+ * executor reports the device offline at the moment a DNS lookup fails or a
+ * connection can't be established. It is therefore best-effort: with no real
+ * provider wired in (the default reports the device as always available) this
+ * never returns `true`, and a device that drops offline after the connection is
+ * made — surfacing as a timeout or I/O error — is not detected here either.
  */
 val RequestExecutionErrorReason.isDeviceOffline: Boolean
     get() = requestExecutionErrorReasonIsDeviceOffline(this)
