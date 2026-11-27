@@ -17,8 +17,6 @@ While the editor is open, only the editor sends the post to the server. Once it 
 
 **GutenbergKit needs the editor to run the save.** Plugins can run code when a post is saved, through hooks on Gutenberg's [`savePost()`](https://github.com/WordPress/gutenberg/blob/%40wordpress/editor%4016.1.0/packages/editor/src/store/actions.js#L243-L476). When the app saves the post itself, `savePost()` never runs, and neither do those hooks ([CMM-2024](https://linear.app/a8c/issue/CMM-2024/videopress-metadata-change-not-persisted) is one resulting bug, in VideoPress). [Editor-driven saving](https://linear.app/a8c/document/editor-driven-saving-design-5520af8f36b9) has the editor save the post to the server while it's open, and the app after it closes. This proposal keeps that split, and adds the reports.
 
-**The editor makes its own requests.** Gutenberg is working on multi-user support, which is one of the reasons for the editor handling its requests itself. Other people are also working, inside the editor, on what it opens with when the server and the device each have a version of the post. wordpress-rs stays out of both, so its work doesn't collide with theirs.
-
 **wordpress-rs needs to keep what the user wrote, and what happened to it.** Local content storage ([wordpress-rs#1682](https://github.com/Automattic/wordpress-rs/pull/1682), a draft) keeps the posts the user edits on the device, so they're never lost. With the editor's reports, it also keeps every version the user went through, and every request the editor sent. After a crash, or when the system ends the app, wordpress-rs can tell from its own records what the user wrote, and which requests got an answer.
 
 ## Terms
