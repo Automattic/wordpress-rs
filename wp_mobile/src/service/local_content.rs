@@ -3,8 +3,9 @@ use wp_api::posts::PostId;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
-        editor_session::{
-            EditorRequest, EditorRequestRecord, EditorResponse, EditorSession, EditorSessionId,
+        editing_session::{
+            ActivitySource, EditingSession, EditingSessionId, SessionRequest, SessionRequestRecord,
+            SessionResponse,
         },
         working_copy::{
             PageWorkingCopy, PageWorkingCopyFields, PostWorkingCopy, PostWorkingCopyFields,
@@ -13,7 +14,10 @@ use wp_mobile_local_content::{
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
         working_copy_version::{WorkingCopyVersion, WorkingCopyVersionId},
     },
-    repository::{editor_sessions::EditorSessionRepository, working_copies::WorkingCopyRepository},
+    repository::{
+        editing_sessions::EditingSessionRepository,
+        working_copies::{VersionSession, WorkingCopyRepository},
+    },
 };
 
 /// Stores the posts and pages the user creates or edits on the device, as
@@ -38,14 +42,21 @@ use wp_mobile_local_content::{
 #[derive(uniffi::Object)]
 pub struct LocalContentService {
     store: Arc<WpLocalContentStore>,
+    client: String,
 }
 
 #[uniffi::export]
 impl LocalContentService {
     /// Create the service on `store`. Run the store's migrations first.
+    ///
+    /// `client` names the program using the store, such as the app or one of
+    /// its extensions. Every session the service opens is recorded as
+    /// `client`'s, and `record_abandoned_sessions` only touches `client`'s
+    /// sessions. Give each program its own name, and keep it the same across
+    /// launches.
     #[uniffi::constructor]
-    pub fn new(store: Arc<WpLocalContentStore>) -> Self {
-        Self { store }
+    pub fn new(store: Arc<WpLocalContentStore>, client: String) -> Self {
+        Self { store, client }
     }
 
     /// Read the working copy of post `post_id` on `site`, or `None` if it has
@@ -74,7 +85,12 @@ impl LocalContentService {
     ) -> Result<PostWorkingCopy, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            let id = WorkingCopyRepository.insert_post(&transaction, &fields, &remote_target)?;
+            let id = WorkingCopyRepository.insert_post(
+                &transaction,
+                &fields,
+                &remote_target,
+                &self.client,
+            )?;
             let created = WorkingCopyRepository
                 .select_post(&transaction, &id)?
                 .ok_or(LocalContentError::WorkingCopyNotFound { id })?;
@@ -95,7 +111,14 @@ impl LocalContentService {
     ) -> Result<(), LocalContentError> {
         let updated = self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            let updated = WorkingCopyRepository.update_post(&transaction, &id, &fields, None)?;
+            let updated = WorkingCopyRepository.update_post(
+                &transaction,
+                &id,
+                &fields,
+                VersionSession::OneOff {
+                    client: &self.client,
+                },
+            )?;
             transaction.commit()?;
             Ok::<_, LocalContentError>(updated)
         })?;
@@ -223,7 +246,12 @@ impl LocalContentService {
     ) -> Result<PageWorkingCopy, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            let id = WorkingCopyRepository.insert_page(&transaction, &fields, &remote_target)?;
+            let id = WorkingCopyRepository.insert_page(
+                &transaction,
+                &fields,
+                &remote_target,
+                &self.client,
+            )?;
             let created = WorkingCopyRepository
                 .select_page(&transaction, &id)?
                 .ok_or(LocalContentError::WorkingCopyNotFound { id })?;
@@ -244,7 +272,14 @@ impl LocalContentService {
     ) -> Result<(), LocalContentError> {
         let updated = self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            let updated = WorkingCopyRepository.update_page(&transaction, &id, &fields, None)?;
+            let updated = WorkingCopyRepository.update_page(
+                &transaction,
+                &id,
+                &fields,
+                VersionSession::OneOff {
+                    client: &self.client,
+                },
+            )?;
             transaction.commit()?;
             Ok::<_, LocalContentError>(updated)
         })?;
@@ -360,81 +395,109 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_page_version(conn, &id))
     }
 
-    /// Start an editor session for a working copy, and return it.
+    /// Open an editing session on a working copy, and return it. The session
+    /// is recorded as this service's client's.
     ///
-    /// `editor_identity` is who the editor makes its requests as, in a form
-    /// that isn't a credential, such as a hash of the token. It's recorded as
+    /// `identity` is who the session makes its requests as, in a form that
+    /// isn't a credential, such as a hash of the token. It's recorded as
     /// given.
     ///
     /// Fails with `WorkingCopyNotFound` if no working copy has the ID.
-    pub fn create_editor_session(
+    pub fn create_editing_session(
         &self,
         working_copy_id: WorkingCopyId,
-        editor_identity: Option<String>,
-    ) -> Result<EditorSession, LocalContentError> {
+        source: ActivitySource,
+        identity: Option<String>,
+    ) -> Result<EditingSession, LocalContentError> {
         self.store.execute(|conn| {
-            let id = EditorSessionRepository.insert(
+            let id = EditingSessionRepository.insert(
                 conn,
                 &working_copy_id,
-                editor_identity.as_deref(),
+                &source,
+                &self.client,
+                identity.as_deref(),
             )?;
-            EditorSessionRepository
+            EditingSessionRepository
                 .select(conn, &id)?
-                .ok_or(LocalContentError::EditorSessionNotFound { id })
+                .ok_or(LocalContentError::EditingSessionNotFound { id })
         })
     }
 
-    /// End a session: when its editor closes, or once a session that didn't
-    /// end normally has been dealt with. Ending a session that has already
-    /// ended keeps its first `ended_at`.
+    /// End a session normally. Ending a session that has already ended keeps
+    /// how it first ended.
     ///
-    /// Fails with `EditorSessionNotFound` if no session has the ID.
-    pub fn end_editor_session(&self, id: EditorSessionId) -> Result<(), LocalContentError> {
-        let ended = self
+    /// Fails with `EditingSessionNotFound` if no session has the ID.
+    pub fn end_editing_session(&self, id: EditingSessionId) -> Result<(), LocalContentError> {
+        let found = self
             .store
-            .execute(|conn| EditorSessionRepository.end(conn, &id))?;
-        found_session(ended, id)
+            .execute(|conn| EditingSessionRepository.end(conn, &id))?;
+        found_session(found, id)
     }
 
-    /// Read every session that hasn't ended, oldest first.
+    /// Record every session this service's client opened in an earlier run of
+    /// the app that never ended as abandoned, and return them, oldest first.
     ///
-    /// That includes sessions an editor still has open.
-    pub fn read_unfinished_editor_sessions(&self) -> Result<Vec<EditorSession>, LocalContentError> {
-        self.store
-            .execute(|conn| EditorSessionRepository.select_unfinished(conn))
+    /// Call it once the app has started, so every earlier session has an end.
+    /// The returned sessions are the ones whose work stopped unexpectedly, such
+    /// as when the app crashed or the system ended it. What to do with them is
+    /// up to the app. Sessions opened in this run, and other clients' sessions,
+    /// are left alone.
+    pub fn record_abandoned_sessions(&self) -> Result<Vec<EditingSession>, LocalContentError> {
+        self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            let abandoned = EditingSessionRepository
+                .record_abandoned(&transaction, &self.client)?
+                .iter()
+                .filter_map(|id| {
+                    EditingSessionRepository
+                        .select(&transaction, id)
+                        .transpose()
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            transaction.commit()?;
+            Ok(abandoned)
+        })
     }
 
-    /// Read the requests the editor reported during a session, in the order
-    /// it reported sending them.
-    pub fn read_editor_session_requests(
+    /// Read every editing session of a working copy, oldest first.
+    pub fn read_editing_sessions(
         &self,
-        id: EditorSessionId,
-    ) -> Result<Vec<EditorRequestRecord>, LocalContentError> {
+        working_copy_id: WorkingCopyId,
+    ) -> Result<Vec<EditingSession>, LocalContentError> {
         self.store
-            .execute(|conn| EditorSessionRepository.select_requests(conn, &id))
+            .execute(|conn| EditingSessionRepository.select_by_working_copy(conn, &working_copy_id))
+    }
+
+    /// Read the requests sent during a session, in the order they were sent.
+    pub fn read_session_requests(
+        &self,
+        id: EditingSessionId,
+    ) -> Result<Vec<SessionRequestRecord>, LocalContentError> {
+        self.store
+            .execute(|conn| EditingSessionRepository.select_requests(conn, &id))
     }
 }
 
 impl LocalContentService {
     /// Read a session by its ID, or `None` if no session has it.
-    pub fn read_editor_session(
+    pub fn read_editing_session(
         &self,
-        id: &EditorSessionId,
-    ) -> Result<Option<EditorSession>, LocalContentError> {
+        id: &EditingSessionId,
+    ) -> Result<Option<EditingSession>, LocalContentError> {
         self.store
-            .execute(|conn| EditorSessionRepository.select(conn, id))
+            .execute(|conn| EditingSessionRepository.select(conn, id))
     }
 
-    /// Record a change the editor made in a session: `fields` become the post
-    /// working copy's fields, as a version recorded in the session, and the
-    /// session's `last_recorded_at` becomes now.
+    /// Record a change made in a session: `fields` become the post working
+    /// copy's fields, as a version recorded in the session, and the session's
+    /// `last_recorded_at` becomes now.
     ///
     /// Fails with `WorkingCopyNotFound` if no post working copy has
-    /// `working_copy_id`, and with `EditorSessionNotFound` if no session has
+    /// `working_copy_id`, and with `EditingSessionNotFound` if no session has
     /// `session_id`.
     pub fn record_post_working_copy_change_in_session(
         &self,
-        session_id: &EditorSessionId,
+        session_id: &EditingSessionId,
         working_copy_id: &WorkingCopyId,
         fields: &PostWorkingCopyFields,
     ) -> Result<(), LocalContentError> {
@@ -444,14 +507,14 @@ impl LocalContentService {
                 &transaction,
                 working_copy_id,
                 fields,
-                Some(session_id),
+                VersionSession::Existing(session_id),
             )? {
                 return Err(LocalContentError::WorkingCopyNotFound {
                     id: working_copy_id.clone(),
                 });
             }
             found_session(
-                EditorSessionRepository.record_change(&transaction, session_id)?,
+                EditingSessionRepository.record_change(&transaction, session_id)?,
                 session_id.clone(),
             )?;
             transaction.commit()?;
@@ -459,35 +522,36 @@ impl LocalContentService {
         })
     }
 
-    /// Record that the editor sent `request` during a session.
-    pub fn record_editor_request_sent(
+    /// Record that `source` sent `request` during a session.
+    pub fn record_session_request_sent(
         &self,
-        id: &EditorSessionId,
-        request: &EditorRequest,
+        id: &EditingSessionId,
+        source: &ActivitySource,
+        request: &SessionRequest,
     ) -> Result<(), LocalContentError> {
         self.store
-            .execute(|conn| EditorSessionRepository.record_request_sent(conn, id, request))
+            .execute(|conn| EditingSessionRepository.record_request_sent(conn, id, source, request))
     }
 
     /// Record the response to a request the session recorded as sent, and
     /// return the completed record.
-    pub fn record_editor_request_response(
+    pub fn record_session_request_response(
         &self,
-        id: &EditorSessionId,
+        id: &EditingSessionId,
         request_id: &str,
-        response: &EditorResponse,
-    ) -> Result<EditorRequestRecord, LocalContentError> {
+        response: &SessionResponse,
+    ) -> Result<SessionRequestRecord, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            EditorSessionRepository.record_request_response(
+            EditingSessionRepository.record_request_response(
                 &transaction,
                 id,
                 request_id,
                 response,
             )?;
-            let record = EditorSessionRepository
+            let record = EditingSessionRepository
                 .select_request(&transaction, id, request_id)?
-                .ok_or_else(|| LocalContentError::EditorRequestNotFound {
+                .ok_or_else(|| LocalContentError::SessionRequestNotFound {
                     request_id: request_id.to_string(),
                 })?;
             transaction.commit()?;
@@ -496,22 +560,22 @@ impl LocalContentService {
     }
 
     /// Record that a request the session recorded as sent got no answer.
-    pub fn record_editor_request_failure(
+    pub fn record_session_request_failure(
         &self,
-        id: &EditorSessionId,
+        id: &EditingSessionId,
         request_id: &str,
         reason: &str,
     ) -> Result<(), LocalContentError> {
         self.store.execute(|conn| {
-            EditorSessionRepository.record_request_failure(conn, id, request_id, reason)
+            EditingSessionRepository.record_request_failure(conn, id, request_id, reason)
         })
     }
 }
 
-fn found_session(found: bool, id: EditorSessionId) -> Result<(), LocalContentError> {
+fn found_session(found: bool, id: EditingSessionId) -> Result<(), LocalContentError> {
     if found {
         Ok(())
     } else {
-        Err(LocalContentError::EditorSessionNotFound { id })
+        Err(LocalContentError::EditingSessionNotFound { id })
     }
 }

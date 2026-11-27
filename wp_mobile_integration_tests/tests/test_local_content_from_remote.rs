@@ -40,7 +40,7 @@ fn open_service(dir: &TempDir) -> LocalContentService {
     store
         .perform_migrations()
         .expect("Migrations should succeed");
-    LocalContentService::new(Arc::new(store))
+    LocalContentService::new(Arc::new(store), "test-app".to_string())
 }
 
 fn site() -> SiteIdentity {

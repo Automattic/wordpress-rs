@@ -146,7 +146,7 @@ fn test_relationships_are_deleted_with_their_working_copy_and_not_without_one() 
     );
     let tx = conn.transaction().expect("Failed to begin transaction");
     WorkingCopyRepository
-        .update_post(&tx, &id, &simple_post("Edited"), None)
+        .update_post(&tx, &id, &simple_post("Edited"), ONE_OFF)
         .expect("Update should succeed");
     tx.commit().expect("Commit should succeed");
 

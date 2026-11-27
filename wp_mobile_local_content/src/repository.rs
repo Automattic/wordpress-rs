@@ -1,7 +1,7 @@
 use crate::LocalContentError;
 use rusqlite::Connection;
 
-pub mod editor_sessions;
+pub mod editing_sessions;
 pub mod working_copies;
 
 /// Runs SQL statements on a connection or a transaction.

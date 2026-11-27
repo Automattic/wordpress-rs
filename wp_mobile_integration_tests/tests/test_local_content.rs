@@ -14,7 +14,7 @@ use wp_mobile::service::local_content::LocalContentService;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
-        editor_session::EditorRequest,
+        editing_session::{ActivitySource, SessionRequest},
         working_copy::{
             FeaturedImage, PageWorkingCopyFields, PostWorkingCopyFields, PublishDate,
             StatusSetting, WorkingCopyCommonFields, WorkingCopyId,
@@ -22,6 +22,12 @@ use wp_mobile_local_content::{
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
 };
+
+fn editor() -> ActivitySource {
+    ActivitySource::Editor {
+        name: Some("GutenbergKit".to_string()),
+    }
+}
 
 /// The database file lives in `dir`, which is deleted when it's dropped.
 fn database_path(dir: &TempDir) -> String {
@@ -38,7 +44,7 @@ fn open_service(dir: &TempDir) -> LocalContentService {
     store
         .perform_migrations()
         .expect("Migrations should succeed");
-    LocalContentService::new(Arc::new(store))
+    LocalContentService::new(Arc::new(store), "test-app".to_string())
 }
 
 fn date(rfc3339: &str) -> WpGmtDateTime {
@@ -370,7 +376,7 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
 }
 
 #[test]
-fn test_unfinished_editor_session_and_what_it_recorded_survive_reopening_the_database() {
+fn test_an_open_session_and_what_it_recorded_survive_reopening_the_database() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let (working_copy_id, unfinished_id) = {
         let service = open_service(&dir);
@@ -379,13 +385,17 @@ fn test_unfinished_editor_session_and_what_it_recorded_survive_reopening_the_dat
             .expect("Create should succeed")
             .id;
         let ended = service
-            .create_editor_session(working_copy_id.clone(), None)
+            .create_editing_session(working_copy_id.clone(), editor(), None)
             .expect("Creating a session should succeed");
         service
-            .end_editor_session(ended.id)
+            .end_editing_session(ended.id)
             .expect("Ending a session should succeed");
         let unfinished = service
-            .create_editor_session(working_copy_id.clone(), Some("identity-hash".to_string()))
+            .create_editing_session(
+                working_copy_id.clone(),
+                editor(),
+                Some("identity-hash".to_string()),
+            )
             .expect("Creating a session should succeed");
         service
             .record_post_working_copy_change_in_session(
@@ -395,9 +405,10 @@ fn test_unfinished_editor_session_and_what_it_recorded_survive_reopening_the_dat
             )
             .expect("Recording a change should succeed");
         service
-            .record_editor_request_sent(
+            .record_session_request_sent(
                 &unfinished.id,
-                &EditorRequest {
+                &editor(),
+                &SessionRequest {
                     request_id: "save".to_string(),
                     method: "POST".to_string(),
                     path: "/wp/v2/posts".to_string(),
@@ -410,28 +421,32 @@ fn test_unfinished_editor_session_and_what_it_recorded_survive_reopening_the_dat
     };
 
     let service = open_service(&dir);
-    let unfinished = service
-        .read_unfinished_editor_sessions()
+    let sessions = service
+        .read_editing_sessions(working_copy_id.clone())
         .expect("Read should succeed");
+    // This process's run opened it, so it isn't abandoned.
+    let abandoned = service
+        .record_abandoned_sessions()
+        .expect("Recording should succeed");
 
-    assert_eq!(unfinished.len(), 1);
-    let session = &unfinished[0];
-    assert_eq!(session.id, unfinished_id);
+    assert!(abandoned.is_empty());
+    let session = sessions
+        .iter()
+        .find(|session| session.id == unfinished_id)
+        .expect("The open session survives");
     assert_eq!(session.working_copy_id, working_copy_id);
-    assert_eq!(session.editor_identity.as_deref(), Some("identity-hash"));
+    assert_eq!(session.identity.as_deref(), Some("identity-hash"));
     assert!(session.last_recorded_at.is_some());
-    assert_eq!(session.ended_at, None);
+    assert_eq!(session.end, None);
     let versions = service
         .read_working_copy_versions(working_copy_id)
         .expect("Read should succeed");
     assert_eq!(
-        versions
-            .last()
-            .and_then(|version| version.editor_session_id.clone()),
+        versions.last().map(|version| version.session_id.clone()),
         Some(unfinished_id.clone())
     );
     let requests = service
-        .read_editor_session_requests(unfinished_id)
+        .read_session_requests(unfinished_id)
         .expect("Read should succeed");
     assert_eq!(requests.len(), 1);
     assert_eq!(

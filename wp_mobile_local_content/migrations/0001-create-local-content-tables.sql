@@ -114,9 +114,9 @@ CREATE TABLE `working_copy_versions` (
   `content_rowid` INTEGER NOT NULL REFERENCES `working_copy_contents`(`rowid`),
   `field_set_rowid` INTEGER NOT NULL REFERENCES `working_copy_field_sets`(`rowid`),
 
-  -- The editor session the version was recorded in. NULL: saved outside an
-  -- editor session
-  `editor_session_rowid` INTEGER REFERENCES `editor_sessions`(`rowid`) ON DELETE SET NULL,
+  -- The editing session the version was saved in. A version goes with its
+  -- session.
+  `session_rowid` INTEGER NOT NULL REFERENCES `editing_sessions`(`rowid`) ON DELETE CASCADE,
 
   `created_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 ) STRICT;
@@ -165,10 +165,11 @@ CREATE TABLE `working_copy_remote_targets` (
   UNIQUE (`site_rowid`, `remote_post_id`)
 ) STRICT;
 
--- One stretch of editing a working copy in an editor, from opening the editor
--- to closing it. A session that ended normally has an `ended_at`. One without
--- it either is still open or didn't end normally.
-CREATE TABLE `editor_sessions` (
+-- One stretch of work on a working copy, such as editing it in an editor, or
+-- one save from a screen of the app. A session that ended has `ended_at` and
+-- `ending`. One without them is still open, until a later run of its client
+-- records it as abandoned.
+CREATE TABLE `editing_sessions` (
   -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -177,31 +178,52 @@ CREATE TABLE `editor_sessions` (
 
   `working_copy_rowid` INTEGER NOT NULL REFERENCES `working_copies`(`rowid`) ON DELETE CASCADE,
 
-  -- Who the app says the editor makes its requests as, in a form that isn't a
-  -- credential. Recorded as given. NULL: the app didn't say
-  `editor_identity` TEXT,
+  -- Where the work happens: 'editor' for an editor, 'app' for the app itself
+  `source` TEXT NOT NULL CHECK (`source` IN ('editor', 'app')),
+  -- Which editor or part of the app, such as GutenbergKit or post-settings.
+  -- NULL: not given
+  `source_name` TEXT,
+
+  -- The client that opened the session, such as the app or one of its
+  -- extensions, as the client names itself
+  `client` TEXT NOT NULL,
+  -- The run of the process that opened the session, a v4 UUID per process
+  `run` TEXT NOT NULL,
+
+  -- Who the session makes its requests as, in a form that isn't a credential.
+  -- Recorded as given. NULL: not given
+  `identity` TEXT,
 
   -- Unix timestamps in seconds
   `started_at` INTEGER NOT NULL,
   -- NULL: no change has been recorded in the session
   `last_recorded_at` INTEGER,
-  -- NULL: the session hasn't ended normally
-  `ended_at` INTEGER
+  -- For an abandoned session, when a later run found it not ended
+  `ended_at` INTEGER,
+  -- 'normal', or 'abandoned' when a later run of its client found it not
+  -- ended. Set exactly when `ended_at` is
+  `ending` TEXT CHECK (`ending` IN ('normal', 'abandoned')),
+
+  CHECK ((`ended_at` IS NULL) = (`ending` IS NULL))
 ) STRICT;
 
--- The requests the editor reported sending during a session, with what came
--- back. A row is added when the editor reports sending the request, and
--- completed when it reports the response or the failure. A row that's never
--- completed is a request whose outcome nobody recorded. Credential headers are
--- left out.
-CREATE TABLE `editor_session_requests` (
+-- The requests sent during a session, by the editor or by wordpress-rs, with
+-- what came back. A row is added when the request is sent, and completed with
+-- its response or failure. A row that's never completed is a request whose
+-- outcome nobody recorded. Credential headers are left out.
+CREATE TABLE `editing_session_requests` (
   -- Internal DB field (auto-incrementing). The order the reports arrived in.
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
-  `editor_session_rowid` INTEGER NOT NULL REFERENCES `editor_sessions`(`rowid`) ON DELETE CASCADE,
+  `session_rowid` INTEGER NOT NULL REFERENCES `editing_sessions`(`rowid`) ON DELETE CASCADE,
 
-  -- The ID the editor gave the request, unique within the session
+  -- The request's ID, unique within the session
   `request_id` TEXT NOT NULL,
+
+  -- Who sent it: 'editor' or 'app', as for a session's `source`
+  `source` TEXT NOT NULL CHECK (`source` IN ('editor', 'app')),
+  -- NULL: not given
+  `source_name` TEXT,
 
   `method` TEXT NOT NULL,
   -- The REST API path with its query, as the editor sent it
@@ -226,5 +248,5 @@ CREATE TABLE `editor_session_requests` (
   CHECK (`status_code` IS NULL OR `failure` IS NULL),
   CHECK ((`status_code` IS NULL) = (`response_headers` IS NULL)),
   CHECK ((`status_code` IS NULL AND `failure` IS NULL) = (`completed_at` IS NULL)),
-  UNIQUE (`editor_session_rowid`, `request_id`)
+  UNIQUE (`session_rowid`, `request_id`)
 ) STRICT;

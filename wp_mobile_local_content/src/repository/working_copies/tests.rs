@@ -5,7 +5,7 @@ use super::*;
 use crate::{
     MIGRATIONS,
     db_types::{
-        editor_session::EditorSessionId,
+        editing_session::{ActivitySource, EditingSessionId},
         working_copy::{StatusSetting, WorkingCopyId, date_from_timestamp},
         working_copy_version::WorkingCopyVersion,
     },
@@ -28,6 +28,9 @@ mod history;
 mod remote_posts;
 mod schema;
 mod sites;
+
+const CLIENT: &str = "test-app";
+const ONE_OFF: VersionSession = VersionSession::OneOff { client: CLIENT };
 
 fn migrated_connection() -> Connection {
     let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
@@ -141,7 +144,7 @@ fn insert_post(
 ) -> WorkingCopyId {
     let tx = conn.transaction().expect("Failed to begin transaction");
     let id = WorkingCopyRepository
-        .insert_post(&tx, fields, remote_target)
+        .insert_post(&tx, fields, remote_target, CLIENT)
         .expect("Insert should succeed");
     tx.commit().expect("Commit should succeed");
     id
@@ -154,7 +157,7 @@ fn insert_page(
 ) -> WorkingCopyId {
     let tx = conn.transaction().expect("Failed to begin transaction");
     let id = WorkingCopyRepository
-        .insert_page(&tx, fields, remote_target)
+        .insert_page(&tx, fields, remote_target, CLIENT)
         .expect("Insert should succeed");
     tx.commit().expect("Commit should succeed");
     id

@@ -10,7 +10,7 @@ use rusqlite::Connection;
 use wp_api::posts::PostId;
 use wp_mobile_sqlite::{ConnectionError, DbConnection, MigrationManager};
 
-use crate::db_types::{editor_session::EditorSessionId, working_copy::WorkingCopyId};
+use crate::db_types::{editing_session::EditingSessionId, working_copy::WorkingCopyId};
 
 pub mod db_types;
 pub mod editor;
@@ -41,13 +41,13 @@ pub enum LocalContentError {
     #[error("A working copy's {field} must be a JSON object")]
     NotAJsonObject { field: String },
     #[error("No editor session with id {}", id.0)]
-    EditorSessionNotFound { id: EditorSessionId },
+    EditingSessionNotFound { id: EditingSessionId },
     #[error("The editor session already has a request with id {request_id}")]
-    EditorRequestAlreadyRecorded { request_id: String },
+    SessionRequestAlreadyRecorded { request_id: String },
     #[error("The editor session has no request with id {request_id}")]
-    EditorRequestNotFound { request_id: String },
+    SessionRequestNotFound { request_id: String },
     #[error("The editor session's request {request_id} already has a response or a failure")]
-    EditorRequestAlreadyCompleted { request_id: String },
+    SessionRequestAlreadyCompleted { request_id: String },
 }
 
 impl From<rusqlite::Error> for LocalContentError {

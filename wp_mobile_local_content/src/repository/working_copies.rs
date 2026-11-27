@@ -6,10 +6,11 @@ use wp_api::{
 };
 use wp_mobile_sqlite::{ColumnIndex, RowExt};
 
+use crate::repository::editing_sessions::insert_one_off;
 use crate::{
     LocalContentError,
     db_types::{
-        editor_session::EditorSessionId,
+        editing_session::EditingSessionId,
         working_copy::{
             FeaturedImage, FieldSetColumn, PageFieldsColumn, PageWorkingCopy,
             PageWorkingCopyFields, PostFieldsColumn, PostWorkingCopy, PostWorkingCopyFields,
@@ -38,7 +39,7 @@ const PAGE_FIELDS: &str = "page_field_sets";
 const VERSIONS: &str = "working_copy_versions";
 const REMOTE_TARGETS: &str = "working_copy_remote_targets";
 const SITES: &str = "sites";
-const EDITOR_SESSIONS: &str = "editor_sessions";
+const EDITOR_SESSIONS: &str = "editing_sessions";
 
 /// Repository for working copies, their history and their remote targets.
 ///
@@ -59,6 +60,8 @@ impl WorkingCopyRepository {
     /// Insert a post working copy with its first version and its remote
     /// target, and return its newly generated ID.
     ///
+    /// The first version is recorded in a one-off session of `client`.
+    ///
     /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
     /// remote post already has a working copy. Roll `transaction` back after
     /// any error, since the rows written before it stay in the transaction.
@@ -67,6 +70,7 @@ impl WorkingCopyRepository {
         transaction: &impl InTransaction,
         fields: &PostWorkingCopyFields,
         remote_target: &WorkingCopyRemoteTarget,
+        client: &str,
     ) -> Result<WorkingCopyId, LocalContentError> {
         let (id, rowid) = insert_working_copy(transaction, WorkingCopyKind::Post)?;
         append_version(
@@ -76,7 +80,7 @@ impl WorkingCopyRepository {
             Changes::ALL,
             &fields.common.content,
             || insert_post_field_set(transaction, rowid, fields),
-            None,
+            || insert_one_off(transaction, rowid, client),
         )?;
         insert_remote_target(transaction, rowid, remote_target)?;
         Ok(id)
@@ -84,6 +88,8 @@ impl WorkingCopyRepository {
 
     /// Insert a page working copy with its first version and its remote
     /// target, and return its newly generated ID.
+    ///
+    /// The first version is recorded in a one-off session of `client`.
     ///
     /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
     /// remote post already has a working copy. Roll `transaction` back after
@@ -93,6 +99,7 @@ impl WorkingCopyRepository {
         transaction: &impl InTransaction,
         fields: &PageWorkingCopyFields,
         remote_target: &WorkingCopyRemoteTarget,
+        client: &str,
     ) -> Result<WorkingCopyId, LocalContentError> {
         let (id, rowid) = insert_working_copy(transaction, WorkingCopyKind::Page)?;
         append_version(
@@ -102,7 +109,7 @@ impl WorkingCopyRepository {
             Changes::ALL,
             &fields.common.content,
             || insert_page_field_set(transaction, rowid, fields),
-            None,
+            || insert_one_off(transaction, rowid, client),
         )?;
         insert_remote_target(transaction, rowid, remote_target)?;
         Ok(id)
@@ -114,23 +121,24 @@ impl WorkingCopyRepository {
     ///
     /// The version refers to its parent's content row if the content didn't
     /// change, and to its parent's field set row if nothing else did.
-    /// `editor_session` is the session the change was recorded in, if any.
+    /// It's recorded in `session`.
     ///
     /// Returns `false` if no post working copy has the ID. Fails with
-    /// `EditorSessionNotFound` if no session has `editor_session`.
+    /// `EditingSessionNotFound` if `session` is an existing one no session has.
     pub fn update_post(
         &self,
         transaction: &impl InTransaction,
         id: &WorkingCopyId,
         fields: &PostWorkingCopyFields,
-        editor_session: Option<&EditorSessionId>,
+        session: VersionSession,
     ) -> Result<bool, LocalContentError> {
         let Some(row) = select_working_copy_row(transaction, WorkingCopyKind::Post, id)? else {
             return Ok(false);
         };
-        let session_rowid = editor_session
-            .map(|session| select_session_rowid(transaction, session))
-            .transpose()?;
+        let existing_session = match session {
+            VersionSession::Existing(session) => Some(select_session_rowid(transaction, session)?),
+            VersionSession::OneOff { .. } => None,
+        };
         let current = select_newest_version(transaction, row.rowid)?;
         let current_fields = select_post_fields(transaction, &current)?;
         let changes = Changes {
@@ -148,7 +156,13 @@ impl WorkingCopyRepository {
             changes,
             &fields.common.content,
             || insert_post_field_set(transaction, row.rowid, fields),
-            session_rowid,
+            || match (existing_session, session) {
+                (Some(rowid), _) => Ok(rowid),
+                (None, VersionSession::OneOff { client }) => {
+                    insert_one_off(transaction, row.rowid, client)
+                }
+                (None, VersionSession::Existing(_)) => unreachable!("Resolved above"),
+            },
         )?;
         Ok(true)
     }
@@ -159,23 +173,24 @@ impl WorkingCopyRepository {
     ///
     /// The version refers to its parent's content row if the content didn't
     /// change, and to its parent's field set row if nothing else did.
-    /// `editor_session` is the session the change was recorded in, if any.
+    /// It's recorded in `session`.
     ///
     /// Returns `false` if no page working copy has the ID. Fails with
-    /// `EditorSessionNotFound` if no session has `editor_session`.
+    /// `EditingSessionNotFound` if `session` is an existing one no session has.
     pub fn update_page(
         &self,
         transaction: &impl InTransaction,
         id: &WorkingCopyId,
         fields: &PageWorkingCopyFields,
-        editor_session: Option<&EditorSessionId>,
+        session: VersionSession,
     ) -> Result<bool, LocalContentError> {
         let Some(row) = select_working_copy_row(transaction, WorkingCopyKind::Page, id)? else {
             return Ok(false);
         };
-        let session_rowid = editor_session
-            .map(|session| select_session_rowid(transaction, session))
-            .transpose()?;
+        let existing_session = match session {
+            VersionSession::Existing(session) => Some(select_session_rowid(transaction, session)?),
+            VersionSession::OneOff { .. } => None,
+        };
         let current = select_newest_version(transaction, row.rowid)?;
         let current_fields = select_page_fields(transaction, &current)?;
         let changes = Changes {
@@ -193,7 +208,13 @@ impl WorkingCopyRepository {
             changes,
             &fields.common.content,
             || insert_page_field_set(transaction, row.rowid, fields),
-            session_rowid,
+            || match (existing_session, session) {
+                (Some(rowid), _) => Ok(rowid),
+                (None, VersionSession::OneOff { client }) => {
+                    insert_one_off(transaction, row.rowid, client)
+                }
+                (None, VersionSession::Existing(_)) => unreachable!("Resolved above"),
+            },
         )?;
         Ok(true)
     }
@@ -346,7 +367,7 @@ impl WorkingCopyRepository {
             "SELECT v.uuid, p.uuid, s.uuid, v.created_at FROM {VERSIONS} v
              JOIN {WORKING_COPIES} w ON w.rowid = v.working_copy_rowid
              LEFT JOIN {VERSIONS} p ON p.rowid = v.parent_rowid
-             LEFT JOIN {EDITOR_SESSIONS} s ON s.rowid = v.editor_session_rowid
+             JOIN {EDITOR_SESSIONS} s ON s.rowid = v.session_rowid
              WHERE w.uuid = ?
              ORDER BY v.rowid"
         ))?;
@@ -355,7 +376,7 @@ impl WorkingCopyRepository {
                 Ok(WorkingCopyVersion {
                     id: row.get(0)?,
                     parent: row.get(1)?,
-                    editor_session_id: row.get(2)?,
+                    session_id: row.get(2)?,
                     created_at: row.get(3)?,
                 })
             })?
@@ -503,6 +524,16 @@ impl Changes {
     };
 }
 
+/// The session a save records its version in.
+#[derive(Clone, Copy)]
+pub enum VersionSession<'a> {
+    /// A session that's already open.
+    Existing(&'a EditingSessionId),
+    /// A session of `client` that starts and ends with the save. It's added
+    /// only if the save adds a version.
+    OneOff { client: &'a str },
+}
+
 fn insert_working_copy(
     transaction: &impl InTransaction,
     kind: WorkingCopyKind,
@@ -518,7 +549,8 @@ fn insert_working_copy(
 /// Add a version to the working copy at `working_copy_rowid`, made from
 /// `parent`. Only what `changes` says changed gets new rows: the content from
 /// `content`, and the other fields from `insert_field_set`, which returns the
-/// new field set's rowid. Nothing is added if nothing changed.
+/// new field set's rowid. `session_rowid` gives the session the version is
+/// recorded in. Nothing is added, and neither is called, if nothing changed.
 ///
 /// A first version takes its working copy's `created_at`, so a working copy
 /// that was never saved again was last updated when it was created.
@@ -529,7 +561,7 @@ fn append_version(
     changes: Changes,
     content: &str,
     insert_field_set: impl FnOnce() -> Result<i64, LocalContentError>,
-    editor_session_rowid: Option<i64>,
+    session_rowid: impl FnOnce() -> Result<i64, LocalContentError>,
 ) -> Result<(), LocalContentError> {
     let (content_rowid, field_set_rowid) = match parent {
         Some(_) if !changes.content && !changes.other_fields => return Ok(()),
@@ -550,11 +582,12 @@ fn append_version(
             insert_field_set()?,
         ),
     };
+    let session_rowid = session_rowid()?;
     transaction.execute(
         &format!(
             "INSERT INTO {VERSIONS} (
                  uuid, working_copy_rowid, parent_rowid, content_rowid, field_set_rowid,
-                 editor_session_rowid, created_at
+                 session_rowid, created_at
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, CASE
                  WHEN ?3 IS NULL THEN (SELECT created_at FROM {WORKING_COPIES} WHERE rowid = ?2)
                  ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
@@ -566,7 +599,7 @@ fn append_version(
             parent.map(|parent| parent.rowid),
             content_rowid,
             field_set_rowid,
-            editor_session_rowid,
+            session_rowid,
         ],
     )?;
     Ok(())
@@ -718,7 +751,7 @@ fn version_rows_from_row(row: &Row) -> rusqlite::Result<VersionRows> {
 
 fn select_session_rowid(
     executor: &impl QueryExecutor,
-    id: &EditorSessionId,
+    id: &EditingSessionId,
 ) -> Result<i64, LocalContentError> {
     executor
         .prepare(&format!(
@@ -726,7 +759,7 @@ fn select_session_rowid(
         ))?
         .query_row([id], |row| row.get(0))
         .optional()?
-        .ok_or_else(|| LocalContentError::EditorSessionNotFound { id: id.clone() })
+        .ok_or_else(|| LocalContentError::EditingSessionNotFound { id: id.clone() })
 }
 
 /// The fields every kind has, from a version's content and field set rows.

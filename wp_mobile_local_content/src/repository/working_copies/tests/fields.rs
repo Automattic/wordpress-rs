@@ -55,7 +55,7 @@ fn test_post_and_page_ids_are_not_interchangeable() {
         .expect("Select should succeed");
     let tx = conn.transaction().expect("Failed to begin transaction");
     let updated_as_post = WorkingCopyRepository
-        .update_post(&tx, &page_id, &simple_post("Not a page"), None)
+        .update_post(&tx, &page_id, &simple_post("Not a page"), ONE_OFF)
         .expect("Update should succeed");
 
     assert_eq!(as_post, None);
@@ -76,7 +76,7 @@ fn test_update_replaces_fields_and_keeps_the_target() {
     let edited = simple_post("Edited");
     let tx = conn.transaction().expect("Failed to begin transaction");
     let updated = WorkingCopyRepository
-        .update_post(&tx, &id, &edited, None)
+        .update_post(&tx, &id, &edited, ONE_OFF)
         .expect("Update should succeed");
     tx.commit().expect("Commit should succeed");
     let after = WorkingCopyRepository
@@ -111,7 +111,7 @@ fn test_update_returns_false_for_unknown_id() {
             &tx,
             &WorkingCopyId("00000000-0000-4000-8000-000000000000".to_string()),
             &simple_post("Title"),
-            None,
+            ONE_OFF,
         )
         .expect("Update should succeed");
     assert!(!updated);
@@ -160,7 +160,7 @@ fn test_custom_status_another_variant_covers_is_saved_as_that_variant() {
         let inserted = insert_post(&mut conn, &post, &remote_target);
         let tx = conn.transaction().expect("Failed to begin transaction");
         WorkingCopyRepository
-            .update_post(&tx, &saved, &post, None)
+            .update_post(&tx, &saved, &post, ONE_OFF)
             .expect("Update should succeed");
         tx.commit().expect("Commit should succeed");
         let status_of = |id: &WorkingCopyId| {
@@ -202,7 +202,7 @@ fn test_working_copies_are_listed_most_recently_updated_first() {
     for id in [&oldest, &newer, &another_sites, &edited_last] {
         let tx = conn.transaction().expect("Failed to begin transaction");
         WorkingCopyRepository
-            .update_post(&tx, id, &simple_post("Saved again"), None)
+            .update_post(&tx, id, &simple_post("Saved again"), ONE_OFF)
             .expect("Update should succeed");
         tx.commit().expect("Commit should succeed");
     }

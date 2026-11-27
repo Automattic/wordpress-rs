@@ -2,17 +2,17 @@
 //! newest, sharing the rows that didn't change.
 
 use super::*;
-use crate::repository::editor_sessions::EditorSessionRepository;
+use crate::repository::editing_sessions::EditingSessionRepository;
 
 fn update(conn: &mut Connection, id: &WorkingCopyId, fields: &PostWorkingCopyFields) {
-    update_in_session(conn, id, fields, None);
+    update_in_session(conn, id, fields, ONE_OFF);
 }
 
 fn update_in_session(
     conn: &mut Connection,
     id: &WorkingCopyId,
     fields: &PostWorkingCopyFields,
-    session: Option<&EditorSessionId>,
+    session: VersionSession,
 ) {
     let tx = conn.transaction().expect("Failed to begin transaction");
     assert!(
@@ -102,37 +102,49 @@ fn test_a_version_shares_the_rows_that_did_not_change() {
 }
 
 #[test]
-fn test_a_version_records_the_editor_session_it_was_made_in() {
+fn test_a_version_records_the_session_it_was_made_in() {
     let mut conn = migrated_connection();
     let id = insert_post(
         &mut conn,
         &simple_post("First"),
         &self_hosted_new_post_target(),
     );
-    let session = EditorSessionRepository
-        .insert(&conn, &id, None)
+    let session = EditingSessionRepository
+        .insert(
+            &conn,
+            &id,
+            &ActivitySource::Editor { name: None },
+            CLIENT,
+            None,
+        )
         .expect("Insert should succeed");
 
     update_in_session(
         &mut conn,
         &id,
         &simple_post("In the editor"),
-        Some(&session),
+        VersionSession::Existing(&session),
     );
-    let missing = EditorSessionId("not-a-session".to_string());
+    let missing = EditingSessionId("not-a-session".to_string());
     let tx = conn.transaction().expect("Failed to begin transaction");
-    let in_missing_session =
-        WorkingCopyRepository.update_post(&tx, &id, &simple_post("Lost"), Some(&missing));
+    let in_missing_session = WorkingCopyRepository.update_post(
+        &tx,
+        &id,
+        &simple_post("Lost"),
+        VersionSession::Existing(&missing),
+    );
     drop(tx);
 
-    let sessions: Vec<_> = versions(&conn, &id)
-        .into_iter()
-        .map(|version| version.editor_session_id)
-        .collect();
-    assert_eq!(sessions, [None, Some(session)]);
+    let history = versions(&conn, &id);
+    assert_eq!(history.len(), 2);
+    assert_ne!(
+        history[0].session_id, session,
+        "The first version is in the one-off session that created the working copy"
+    );
+    assert_eq!(history[1].session_id, session);
     assert_eq!(
         in_missing_session,
-        Err(LocalContentError::EditorSessionNotFound { id: missing })
+        Err(LocalContentError::EditingSessionNotFound { id: missing })
     );
 }
 

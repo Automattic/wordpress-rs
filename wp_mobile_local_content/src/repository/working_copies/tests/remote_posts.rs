@@ -22,7 +22,8 @@ fn test_a_remote_post_has_at_most_one_working_copy() {
 
     let insert = |conn: &mut Connection, remote_target: &WorkingCopyRemoteTarget| {
         let tx = conn.transaction().expect("Failed to begin transaction");
-        let result = WorkingCopyRepository.insert_post(&tx, &simple_post("Another"), remote_target);
+        let result =
+            WorkingCopyRepository.insert_post(&tx, &simple_post("Another"), remote_target, CLIENT);
         // A failed insert has already written the working copy's row, so
         // it's rolled back by dropping the transaction rather than committed.
         if result.is_ok() {

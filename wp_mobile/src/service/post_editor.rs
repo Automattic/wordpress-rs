@@ -13,7 +13,7 @@
 //! place.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
@@ -24,17 +24,18 @@ use wp_api::{
     api_client::{IsWpApiClientDelegate, WpApiClient},
     api_error::{RequestExecutionError, RequestExecutionErrorReason},
     middleware::PerformsRequests,
-    posts::{AnyPostWithEditContext, PostId, PostMeta, PostRetrieveParams},
+    posts::{AnyPostWithEditContext, PostId, PostMeta},
     request::{
-        InnerRequestBuilder, WpNetworkRequest, WpNetworkResponse,
-        endpoint::{ApiEndpointUrl, ApiUrlResolver, posts_endpoint::PostEndpointType},
+        InnerRequestBuilder, NetworkRequestAccessor, WpNetworkHeaderMap, WpNetworkRequest,
+        WpNetworkResponse,
+        endpoint::{ApiEndpointUrl, ApiUrlResolver},
     },
 };
 use wp_mobile_local_content::{
     LocalContentError,
     db_types::{
-        editor_session::{
-            EditorRequest, EditorRequestRecord, EditorResponse, EditorSession, EditorSessionId,
+        editing_session::{
+            ActivitySource, EditingSessionId, SessionRequest, SessionRequestRecord, SessionResponse,
         },
         working_copy::{
             FeaturedImage, PostWorkingCopy, PostWorkingCopyFields, PublishDate, StatusSetting,
@@ -138,7 +139,7 @@ impl From<RemotePostConversionError> for PostEditorError {
 
 /// Editing a site's posts: what the editor does is recorded through here.
 ///
-/// Open a post with `open_post` or `open_new_post`, which start an editor
+/// Open a post with `open_post` or `open_new_post`, which start an editing
 /// session, and keep the returned `PostEditorSession` while the editor is
 /// open. After the editor closes, push a working copy with
 /// `push_working_copy`.
@@ -149,8 +150,6 @@ pub struct PostEditorService {
     posts: Arc<PostService>,
     local_content: Arc<LocalContentService>,
     site: SiteIdentity,
-    /// The sessions a `PostEditorSession` in this process has open.
-    open_sessions: Mutex<HashSet<EditorSessionId>>,
     push_locks: Mutex<HashMap<WorkingCopyId, Arc<AsyncMutex<()>>>>,
 }
 
@@ -173,48 +172,59 @@ impl PostEditorService {
         )
     }
 
-    /// Start an editor session for post `post_id` from the server.
+    /// Start an editing session for post `post_id` from the server, in the
+    /// editor named `editor_name`, such as GutenbergKit.
     ///
-    /// Uses the post's working copy if it has one, and otherwise creates one
-    /// from the post in the cache. Fetches the post if the cache doesn't have
-    /// it.
+    /// Uses the post's working copy if it has one. Otherwise creates one from
+    /// the post in the cache, fetching the post if the cache doesn't have it.
     ///
-    /// `editor_identity` is who the editor makes its requests as, in a form
-    /// that isn't a credential, such as a hash of its token. It's recorded on
-    /// the session as given, and nothing else uses it yet.
+    /// `identity` is who the editor makes its requests as, in a form that
+    /// isn't a credential, such as a hash of its token. It's recorded on the
+    /// session as given, and nothing else uses it yet.
     pub async fn open_post(
         self: Arc<Self>,
         post_id: PostId,
-        editor_identity: Option<String>,
+        editor_name: Option<String>,
+        identity: Option<String>,
     ) -> Result<Arc<PostEditorSession>, PostEditorError> {
-        let cached = match self.posts.read_cached_post(post_id)? {
-            Some(post) => post,
-            None => self.fetch_post(post_id).await?,
-        };
         let working_copy = match self
             .local_content
             .read_post_working_copy_for_remote_post(self.site.clone(), post_id)?
         {
             Some(working_copy) => working_copy,
-            None => self.local_content.create_post_working_copy(
-                WorkingCopyRemoteTarget {
-                    site: self.site.clone(),
-                    remote_post: Some(RemotePostReference::from_remote(&cached)),
-                },
-                PostWorkingCopyFields::from_remote(&cached)?,
-            )?,
+            None => {
+                // [decision] The fetch that creates a working copy isn't
+                // logged: a session can't exist before its working copy.
+                let server_post = match self.posts.read_cached_post(post_id)? {
+                    Some(post) => post,
+                    None => self.fetch_post(post_id, None).await?,
+                };
+                self.local_content.create_post_working_copy(
+                    WorkingCopyRemoteTarget {
+                        site: self.site.clone(),
+                        remote_post: Some(RemotePostReference::from_remote(&server_post)),
+                    },
+                    PostWorkingCopyFields::from_remote(&server_post)?,
+                )?
+            }
         };
-        self.start_session(working_copy.id, editor_identity)
+        self.start_session(
+            working_copy.id,
+            ActivitySource::Editor { name: editor_name },
+            identity,
+        )
     }
 
-    /// Start an editor session for a new post: a working copy with no remote
-    /// post. The editor creates the post on the server when it first saves
-    /// it, and reporting that save links the working copy to the new post.
+    /// Start an editing session for a new post, in the editor named
+    /// `editor_name`: a working copy with no remote post. The editor creates
+    /// the post on the server when it first saves it, and reporting that save
+    /// links the working copy to the new post.
     ///
-    /// `editor_identity` is recorded as `open_post` records it.
+    /// `identity` is recorded as `open_post` records it.
     pub fn open_new_post(
         self: Arc<Self>,
-        editor_identity: Option<String>,
+        editor_name: Option<String>,
+        identity: Option<String>,
     ) -> Result<Arc<PostEditorSession>, PostEditorError> {
         let working_copy = self.local_content.create_post_working_copy(
             WorkingCopyRemoteTarget {
@@ -223,7 +233,11 @@ impl PostEditorService {
             },
             empty_post_fields(),
         )?;
-        self.start_session(working_copy.id, editor_identity)
+        self.start_session(
+            working_copy.id,
+            ActivitySource::Editor { name: editor_name },
+            identity,
+        )
     }
 
     /// Send a working copy to the server, creating the post there if it
@@ -232,45 +246,28 @@ impl PostEditorService {
     /// Use it after the editor has closed. While it's open, the editor saves
     /// the post itself.
     ///
-    /// Updating a post fetches it first, then sends only the fields that
-    /// differ from the server's. Fails with `Conflict` if the post changed on
-    /// the server since the base version and the working copy differs from
-    /// it, and with `NotSent` or `MaybeSent` if no answer came. Any answer,
-    /// error statuses included, is returned. On a successful one, the post
-    /// goes into the cache and becomes the working copy's base version.
+    /// The push is a one-off editing session of its own, named `push`, so its
+    /// requests are in that session's request log. Updating a post fetches it
+    /// first, then sends only the fields that differ from the server's. Fails
+    /// with `Conflict` if the post changed on the server since the base
+    /// version and the working copy differs from it, and with `NotSent` or
+    /// `MaybeSent` if no answer came. Any answer, error statuses included, is
+    /// returned. On a successful one, the post goes into the cache and becomes
+    /// the working copy's base version.
     pub async fn push_working_copy(
         &self,
         working_copy_id: WorkingCopyId,
     ) -> Result<ServerResponse, PostEditorError> {
-        self.push(&working_copy_id).await
-    }
-
-    /// The editor sessions on this site that didn't end normally, such as
-    /// when the app crashed or the system ended it, oldest first. Sessions
-    /// open in this process aren't included.
-    ///
-    /// What each recorded is in its working copy's versions and in its
-    /// request log.
-    pub fn read_unfinished_sessions(&self) -> Result<Vec<EditorSession>, PostEditorError> {
-        let open = self
-            .open_sessions
-            .lock()
-            .expect("The open sessions lock isn't poisoned")
-            .clone();
-        let mut unfinished = Vec::new();
-        for session in self.local_content.read_unfinished_editor_sessions()? {
-            if open.contains(&session.id) {
-                continue;
-            }
-            let on_this_site = self
-                .local_content
-                .read_post_working_copy(session.working_copy_id.clone())?
-                .is_some_and(|working_copy| working_copy.remote_target.site == self.site);
-            if on_this_site {
-                unfinished.push(session);
-            }
-        }
-        Ok(unfinished)
+        let session = self.local_content.create_editing_session(
+            working_copy_id.clone(),
+            ActivitySource::App {
+                name: Some("push".to_string()),
+            },
+            None,
+        )?;
+        let result = self.push(&working_copy_id, &session.id).await;
+        self.local_content.end_editing_session(session.id)?;
+        result
     }
 }
 
@@ -288,7 +285,6 @@ impl PostEditorService {
             posts,
             local_content,
             site,
-            open_sessions: Mutex::new(HashSet::new()),
             push_locks: Mutex::new(HashMap::new()),
         }
     }
@@ -296,19 +292,19 @@ impl PostEditorService {
     fn start_session(
         self: Arc<Self>,
         working_copy_id: WorkingCopyId,
-        editor_identity: Option<String>,
+        source: ActivitySource,
+        identity: Option<String>,
     ) -> Result<Arc<PostEditorSession>, PostEditorError> {
-        let session = self
-            .local_content
-            .create_editor_session(working_copy_id.clone(), editor_identity)?;
-        self.open_sessions
-            .lock()
-            .expect("The open sessions lock isn't poisoned")
-            .insert(session.id.clone());
+        let session = self.local_content.create_editing_session(
+            working_copy_id.clone(),
+            source.clone(),
+            identity,
+        )?;
         Ok(Arc::new(PostEditorSession {
             service: self,
             id: session.id,
             working_copy_id,
+            source,
             reports: AsyncMutex::new(()),
         }))
     }
@@ -319,21 +315,103 @@ impl PostEditorService {
             .ok_or_else(|| PostEditorError::WorkingCopyNotFound { id: id.clone() })
     }
 
-    /// Fetch a post with the edit context and put it in the cache.
-    async fn fetch_post(&self, post_id: PostId) -> Result<AnyPostWithEditContext, PostEditorError> {
-        let post = self
+    /// Send one of wordpress-rs's own requests. In a session, the request and
+    /// its response or failure go into the session's request log.
+    ///
+    /// The request is sent even if logging it fails, and the failure is
+    /// logged as a warning.
+    async fn send(
+        &self,
+        request: WpNetworkRequest,
+        session: Option<&EditingSessionId>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let source = ActivitySource::App { name: None };
+        let request_id = request.request_id();
+        if let Some(session) = session {
+            let url = url::Url::parse(&request.url().0).ok();
+            let logged = SessionRequest {
+                request_id: request_id.clone(),
+                method: format!("{:?}", request.method()),
+                path: url
+                    .map(|url| match url.query() {
+                        Some(query) => format!("{}?{query}", url.path()),
+                        None => url.path().to_string(),
+                    })
+                    .unwrap_or_else(|| request.url().0),
+                headers: string_headers(&request.header_map()),
+                body: request.body_as_string().map(String::into_bytes),
+            };
+            if let Err(err) = self
+                .local_content
+                .record_session_request_sent(session, &source, &logged)
+            {
+                log::warn!("Logging a request in session {} failed: {err}", session.0);
+            }
+        }
+        let result = self
             .api_client
             .posts()
-            .retrieve_with_edit_context(
-                &PostEndpointType::Posts,
-                &post_id,
-                &PostRetrieveParams::default(),
+            .perform(Arc::new(request), None)
+            .await;
+        if let Some(session) = session {
+            let logged = match &result {
+                Ok(response) => self
+                    .local_content
+                    .record_session_request_response(
+                        session,
+                        &request_id,
+                        &SessionResponse {
+                            status_code: response.status_code,
+                            headers: string_headers(&response.response_header_map),
+                            body: response.body.clone(),
+                        },
+                    )
+                    .map(|_| ()),
+                Err(err) => self.local_content.record_session_request_failure(
+                    session,
+                    &request_id,
+                    &err.to_string(),
+                ),
+            };
+            if let Err(err) = logged {
+                log::warn!("Logging a response in session {} failed: {err}", session.0);
+            }
+        }
+        result
+    }
+
+    /// Fetch a post with the edit context and put it in the cache. In a
+    /// session, the fetch is logged in it.
+    async fn fetch_post(
+        &self,
+        post_id: PostId,
+        session: Option<&EditingSessionId>,
+    ) -> Result<AnyPostWithEditContext, PostEditorError> {
+        let mut url = self
+            .api_url_resolver
+            .resolve(
+                "wp/v2".to_string(),
+                vec!["posts".to_string(), post_id.0.to_string()],
             )
+            .inner
+            .clone();
+        url.query_pairs_mut().append_pair("context", "edit");
+        let request =
+            InnerRequestBuilder::new(self.api_client.posts().get_delegate().auth_provider.clone())
+                .get(ApiEndpointUrl::new(url));
+        let fetch_failed = |reason: String| PostEditorError::FetchFailed { reason };
+        let response = self
+            .send(request, session)
             .await
-            .map_err(|err| PostEditorError::FetchFailed {
-                reason: err.to_string(),
-            })?
-            .data;
+            .map_err(|err| fetch_failed(err.to_string()))?;
+        if !is_success(response.status_code) {
+            return Err(fetch_failed(format!(
+                "The server answered with status {}",
+                response.status_code
+            )));
+        }
+        let post: AnyPostWithEditContext =
+            serde_json::from_slice(&response.body).map_err(|err| fetch_failed(err.to_string()))?;
         self.posts.cache_post_from_server(&post)?;
         Ok(post)
     }
@@ -356,10 +434,11 @@ impl PostEditorService {
             .post(ApiEndpointUrl::new(url), Some(body))
     }
 
-    /// Push a working copy and return the server's response.
+    /// Push a working copy in `session`, and return the server's response.
     async fn push(
         &self,
         working_copy_id: &WorkingCopyId,
+        session: &EditingSessionId,
     ) -> Result<ServerResponse, PostEditorError> {
         // [decision] One push at a time per working copy: a push waits for one
         // already in flight.
@@ -376,16 +455,16 @@ impl PostEditorService {
             // A new post: every field goes into the create.
             None => (None, working_copy.fields.to_rest_fields()),
             Some(remote_post) => {
-                let changes = self.changes_to_push(&working_copy, remote_post).await?;
+                let changes = self
+                    .changes_to_push(&working_copy, remote_post, session)
+                    .await?;
                 (Some(remote_post), changes)
             }
         };
         let request = self.write_request(remote_post.map(|remote_post| remote_post.post_id), &body);
 
         let response = self
-            .api_client
-            .posts()
-            .perform(Arc::new(request), None)
+            .send(request, Some(session))
             .await
             .map_err(push_failure)?;
         if !is_success(response.status_code) {
@@ -399,7 +478,6 @@ impl PostEditorService {
                     reason: err.to_string(),
                 }
             })?;
-        // wordpress-rs's own request, so it fills the cache.
         self.posts.cache_post_from_server(&post)?;
         // The base version comes from this response, not a later fetch, which
         // could already include someone else's change.
@@ -410,8 +488,8 @@ impl PostEditorService {
         Ok(ServerResponse::from(response))
     }
 
-    /// Fetch the post a working copy updates, and return the fields that
-    /// differ from the server's.
+    /// Fetch the post a working copy updates, in `session`, and return the
+    /// fields that differ from the server's.
     ///
     /// Fails with `Conflict` if the post changed on the server since the base
     /// version and the working copy differs from it, and with `NotSent` if
@@ -420,15 +498,16 @@ impl PostEditorService {
         &self,
         working_copy: &PostWorkingCopy,
         remote_post: RemotePostReference,
+        session: &EditingSessionId,
     ) -> Result<Map<String, Value>, PostEditorError> {
         // [decision] Fetch the post first, to check for a conflict and to send
         // only what changed.
-        let server_post =
-            self.fetch_post(remote_post.post_id)
-                .await
-                .map_err(|err| PostEditorError::NotSent {
-                    reason: format!("Fetching the post before pushing failed: {err}"),
-                })?;
+        let server_post = self
+            .fetch_post(remote_post.post_id, Some(session))
+            .await
+            .map_err(|err| PostEditorError::NotSent {
+                reason: format!("Fetching the post before pushing failed: {err}"),
+            })?;
         let server_fields = PostWorkingCopyFields::from_remote(&server_post)?;
         // [decision] Send only the fields that differ from the server's.
         let changes = working_copy.fields.rest_fields_changed_from(&server_fields);
@@ -452,8 +531,8 @@ impl PostEditorService {
     }
 }
 
-/// One editor session: a post open in the editor, from opening it to closing
-/// it.
+/// One editing session in an editor: a post open in the editor, from opening
+/// it to closing it.
 ///
 /// While the editor is open, it's the source of truth, and it makes its own
 /// requests for the post. Pass each of its reports here: `record_change` for a
@@ -465,24 +544,18 @@ impl PostEditorService {
 #[derive(uniffi::Object)]
 pub struct PostEditorSession {
     service: Arc<PostEditorService>,
-    id: EditorSessionId,
+    id: EditingSessionId,
     working_copy_id: WorkingCopyId,
+    /// The editor, which sends the requests reported here.
+    source: ActivitySource,
     /// Held while a report is recorded, so the working copy's versions and
     /// the request log follow the order the reports arrived in.
     reports: AsyncMutex<()>,
 }
 
-impl Drop for PostEditorSession {
-    fn drop(&mut self) {
-        if let Ok(mut open_sessions) = self.service.open_sessions.lock() {
-            open_sessions.remove(&self.id);
-        }
-    }
-}
-
 #[uniffi::export]
 impl PostEditorSession {
-    pub fn id(&self) -> EditorSessionId {
+    pub fn id(&self) -> EditingSessionId {
         self.id.clone()
     }
 
@@ -532,11 +605,14 @@ impl PostEditorSession {
     /// holds exactly what the editor is sending, so its fields are also
     /// recorded as a version of the working copy: change reports can be a
     /// moment behind.
-    pub async fn record_request_sent(&self, request: EditorRequest) -> Result<(), PostEditorError> {
+    pub async fn record_request_sent(
+        &self,
+        request: SessionRequest,
+    ) -> Result<(), PostEditorError> {
         let _report = self.reports.lock().await;
         self.service
             .local_content
-            .record_editor_request_sent(&self.id, &request)?;
+            .record_session_request_sent(&self.id, &self.source, &request)?;
         let is_write = matches!(
             classify_request(&request, self.remote_post_id()?),
             Some(PostRequest::Create | PostRequest::Update)
@@ -560,10 +636,10 @@ impl PostEditorSession {
     pub async fn record_request_response(
         &self,
         request_id: String,
-        response: EditorResponse,
+        response: SessionResponse,
     ) -> Result<(), PostEditorError> {
         let _report = self.reports.lock().await;
-        let record = self.service.local_content.record_editor_request_response(
+        let record = self.service.local_content.record_session_request_response(
             &self.id,
             &request_id,
             &response,
@@ -579,7 +655,7 @@ impl PostEditorSession {
         reason: String,
     ) -> Result<(), PostEditorError> {
         let _report = self.reports.lock().await;
-        Ok(self.service.local_content.record_editor_request_failure(
+        Ok(self.service.local_content.record_session_request_failure(
             &self.id,
             &request_id,
             &reason,
@@ -588,11 +664,11 @@ impl PostEditorSession {
 
     /// The requests the editor reported in this session, in the order it
     /// reported sending them.
-    pub fn requests(&self) -> Result<Vec<EditorRequestRecord>, PostEditorError> {
+    pub fn requests(&self) -> Result<Vec<SessionRequestRecord>, PostEditorError> {
         Ok(self
             .service
             .local_content
-            .read_editor_session_requests(self.id.clone())?)
+            .read_session_requests(self.id.clone())?)
     }
 
     /// End the session normally, when the editor closes.
@@ -600,7 +676,7 @@ impl PostEditorSession {
         Ok(self
             .service
             .local_content
-            .end_editor_session(self.id.clone())?)
+            .end_editing_session(self.id.clone())?)
     }
 }
 
@@ -619,8 +695,8 @@ impl PostEditorSession {
     /// `_fields`, or a create or an update, whose responses always are.
     fn take_server_post(
         &self,
-        record: &EditorRequestRecord,
-        response: &EditorResponse,
+        record: &SessionRequestRecord,
+        response: &SessionResponse,
     ) -> Result<(), PostEditorError> {
         if !is_success(response.status_code) {
             return Ok(());
@@ -674,7 +750,7 @@ enum PostRequest {
 /// the requests in `PostRequest`, such as a read with `_fields`, or a request
 /// for an autosave or another post.
 fn classify_request(
-    request: &EditorRequest,
+    request: &SessionRequest,
     remote_post_id: Option<PostId>,
 ) -> Option<PostRequest> {
     let (path, query) = match request.path.split_once('?') {
@@ -724,6 +800,26 @@ fn push_failure(err: RequestExecutionError) -> PostEditorError {
     }
 }
 
+/// Header names in lowercase. A header with several values has them joined
+/// with `, `.
+fn string_headers(headers: &WpNetworkHeaderMap) -> HashMap<String, String> {
+    headers
+        .to_header_map()
+        .iter()
+        .fold(HashMap::new(), |mut strings, (name, value)| {
+            if let Ok(value) = value.to_str() {
+                strings
+                    .entry(name.as_str().to_string())
+                    .and_modify(|joined: &mut String| {
+                        joined.push_str(", ");
+                        joined.push_str(value);
+                    })
+                    .or_insert_with(|| value.to_string());
+            }
+            strings
+        })
+}
+
 fn is_success(status_code: u32) -> bool {
     (200..300).contains(&status_code)
 }
@@ -765,21 +861,7 @@ fn empty_post_fields() -> PostWorkingCopyFields {
 
 impl From<WpNetworkResponse> for ServerResponse {
     fn from(response: WpNetworkResponse) -> Self {
-        let headers = response.response_header_map.to_header_map().iter().fold(
-            HashMap::<String, String>::new(),
-            |mut headers, (name, value)| {
-                if let Ok(value) = value.to_str() {
-                    headers
-                        .entry(name.as_str().to_string())
-                        .and_modify(|joined| {
-                            joined.push_str(", ");
-                            joined.push_str(value);
-                        })
-                        .or_insert_with(|| value.to_string());
-                }
-                headers
-            },
-        );
+        let headers = string_headers(&response.response_header_map);
         Self {
             status_code: response.status_code,
             headers,

@@ -22,7 +22,7 @@ use wp_mobile_integration_tests::*;
 use wp_mobile_local_content::{
     WpLocalContentStore,
     db_types::{
-        editor_session::{EditorRequest, EditorResponse},
+        editing_session::{SessionRequest, SessionResponse},
         working_copy::{PostWorkingCopyFields, PublishDate},
         working_copy_remote_target::SiteIdentity,
     },
@@ -39,7 +39,10 @@ fn open_local_content(dir: &TempDir) -> Arc<LocalContentService> {
     store
         .perform_migrations()
         .expect("Migrations should succeed");
-    Arc::new(LocalContentService::new(Arc::new(store)))
+    Arc::new(LocalContentService::new(
+        Arc::new(store),
+        "test-app".to_string(),
+    ))
 }
 
 fn site() -> SiteIdentity {
@@ -189,7 +192,7 @@ async fn editor_sends(
     let request = InnerRequestBuilder::new(auth_provider).post(url.into(), Some(&body));
 
     session
-        .record_request_sent(EditorRequest {
+        .record_request_sent(SessionRequest {
             request_id: request_id.to_string(),
             method: "POST".to_string(),
             path,
@@ -208,7 +211,7 @@ async fn editor_sends(
     session
         .record_request_response(
             request_id.to_string(),
-            EditorResponse {
+            SessionResponse {
                 status_code,
                 headers: HashMap::new(),
                 body: response.body,
@@ -245,7 +248,7 @@ async fn test_editor_save_is_recorded_and_its_response_becomes_the_base_version(
     ));
     let session = service
         .clone()
-        .open_post(post_id, None)
+        .open_post(post_id, None, None)
         .await
         .expect("Opening the post should succeed");
 
@@ -293,7 +296,7 @@ async fn test_new_post_the_editor_creates_becomes_the_working_copy_remote_post()
     ));
     let session = service
         .clone()
-        .open_new_post(None)
+        .open_new_post(None, None)
         .expect("Opening a new post should succeed");
     session
         .record_change(
@@ -354,7 +357,7 @@ async fn test_editor_date_is_pushed_in_the_site_timezone_and_null_floats_it() {
     ));
     let session = service
         .clone()
-        .open_post(post_id, None)
+        .open_post(post_id, None, None)
         .await
         .expect("Opening the post should succeed");
     let change_date_and_push = |date: Value| {
@@ -416,7 +419,7 @@ async fn test_push_matching_the_server_is_not_a_conflict() {
     ));
     let session = service
         .clone()
-        .open_post(post_id, None)
+        .open_post(post_id, None, None)
         .await
         .expect("Opening the post should succeed");
 

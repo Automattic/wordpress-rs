@@ -4,7 +4,7 @@
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use uuid::Uuid;
 
-use crate::db_types::editor_session::EditorSessionId;
+use crate::db_types::editing_session::EditingSessionId;
 
 uniffi::custom_newtype!(WorkingCopyVersionId, String);
 
@@ -39,9 +39,8 @@ pub struct WorkingCopyVersion {
     /// The version this one was made from, or `None` for the working copy's
     /// first version.
     pub parent: Option<WorkingCopyVersionId>,
-    /// The editor session the version was recorded in, or `None` if it was
-    /// saved outside one.
-    pub editor_session_id: Option<EditorSessionId>,
+    /// The editing session the version was saved in.
+    pub session_id: EditingSessionId,
     /// When the version was saved, as an ISO 8601 UTC timestamp.
     pub created_at: String,
 }

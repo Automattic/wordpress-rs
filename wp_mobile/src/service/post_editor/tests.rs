@@ -24,7 +24,8 @@ use wp_mobile_cache::{
     repository::sites::SiteRepository,
 };
 use wp_mobile_local_content::{
-    WpLocalContentStore, db_types::editor_session::EditorRequestOutcome,
+    WpLocalContentStore,
+    db_types::editing_session::{ActivitySource, SessionEnd, SessionRequestOutcome},
 };
 use wp_mobile_sqlite::MigrationManager;
 
@@ -207,7 +208,10 @@ fn context() -> Context {
     store
         .perform_migrations()
         .expect("Migrations should succeed");
-    let local_content = Arc::new(LocalContentService::new(Arc::new(store)));
+    let local_content = Arc::new(LocalContentService::new(
+        Arc::new(store),
+        "test-app".to_string(),
+    ));
 
     let service = Arc::new(PostEditorService::from_parts(
         api_client,
@@ -233,8 +237,8 @@ fn editor_request(
     method: &str,
     path: &str,
     body: Option<Value>,
-) -> EditorRequest {
-    EditorRequest {
+) -> SessionRequest {
+    SessionRequest {
         request_id: request_id.to_string(),
         method: method.to_string(),
         path: path.to_string(),
@@ -243,8 +247,8 @@ fn editor_request(
     }
 }
 
-fn editor_response(status_code: u32, body: &Value) -> EditorResponse {
-    EditorResponse {
+fn editor_response(status_code: u32, body: &Value) -> SessionResponse {
+    SessionResponse {
         status_code,
         headers: HashMap::new(),
         body: serde_json::to_vec(body).expect("JSON serializes"),
@@ -297,13 +301,17 @@ async fn open_post_42(ctx: &Context) -> Arc<PostEditorSession> {
     serve_post_42_unchanged(ctx);
     ctx.service
         .clone()
-        .open_post(PostId(42), Some("identity-hash".to_string()))
+        .open_post(
+            PostId(42),
+            Some("GutenbergKit".to_string()),
+            Some("identity-hash".to_string()),
+        )
         .await
         .expect("Opening the post should succeed")
 }
 
 /// Report that the editor sent `request` and got `response` to it.
-async fn report(session: &PostEditorSession, request: EditorRequest, response: EditorResponse) {
+async fn report(session: &PostEditorSession, request: SessionRequest, response: SessionResponse) {
     let request_id = request.request_id.clone();
     session
         .record_request_sent(request)
@@ -334,9 +342,9 @@ async fn test_the_editor_opens_with_the_working_copy_as_the_latest_post() {
     assert_eq!(post["content"], "<p>Content</p>");
     assert_eq!(
         ctx.local_content
-            .read_editor_session(&session.id())
+            .read_editing_session(&session.id())
             .expect("Read should succeed")
-            .and_then(|session| session.editor_identity),
+            .and_then(|session| session.identity),
         Some("identity-hash".to_string())
     );
 }
@@ -347,7 +355,7 @@ async fn test_a_new_post_opens_without_an_id() {
     let session = ctx
         .service
         .clone()
-        .open_new_post(None)
+        .open_new_post(None, None)
         .expect("Opening should succeed");
 
     let editor_post = session.editor_post().expect("Reading should succeed");
@@ -373,10 +381,13 @@ async fn test_each_change_is_a_version_recorded_in_the_session() {
         .read_working_copy_versions(session.working_copy_id())
         .expect("Read should succeed")
         .into_iter()
-        .map(|version| version.editor_session_id)
+        .map(|version| version.session_id)
         .collect();
-    // The version the working copy was created with, then one per change.
-    assert_eq!(sessions, [None, Some(session.id()), Some(session.id())]);
+    // The version the working copy was created with, in its own one-off
+    // session, then one per change.
+    assert_eq!(sessions.len(), 3);
+    assert_ne!(sessions[0], session.id());
+    assert_eq!(&sessions[1..], [session.id(), session.id()]);
 }
 
 #[tokio::test]
@@ -424,7 +435,7 @@ async fn test_an_editor_save_is_logged_recorded_and_taken_as_the_server_version(
     );
     assert!(matches!(
         &requests[0].outcome,
-        Some(EditorRequestOutcome::Response { response, .. }) if response.status_code == 200
+        Some(SessionRequestOutcome::Response { response, .. }) if response.status_code == 200
     ));
 }
 
@@ -434,7 +445,7 @@ async fn test_a_new_post_the_editor_creates_becomes_the_working_copy_remote_post
     let session = ctx
         .service
         .clone()
-        .open_new_post(None)
+        .open_new_post(None, None)
         .expect("Opening should succeed");
 
     report(
@@ -558,33 +569,28 @@ async fn test_a_request_that_got_no_answer_is_logged_as_such() {
         .collect();
     assert!(matches!(
         outcomes.as_slice(),
-        [Some(EditorRequestOutcome::Failure { .. }), None]
+        [Some(SessionRequestOutcome::Failure { .. }), None]
     ));
 }
 
 #[tokio::test]
-async fn test_open_sessions_are_not_unfinished() {
+async fn test_sessions_of_this_run_are_not_recorded_as_abandoned() {
     let ctx = context();
     let open = open_post_42(&ctx).await;
-    let closed_id = {
-        let crashed = ctx
-            .service
-            .clone()
-            .open_new_post(None)
-            .expect("Opening should succeed");
-        crashed.id()
-    };
 
-    let unfinished: Vec<_> = ctx
-        .service
-        .read_unfinished_sessions()
-        .expect("Reading should succeed")
-        .into_iter()
-        .map(|session| session.id)
-        .collect();
+    let abandoned = ctx
+        .local_content
+        .record_abandoned_sessions()
+        .expect("Recording should succeed");
 
-    assert_eq!(unfinished, [closed_id]);
-    open.end().expect("Ending should succeed");
+    assert!(abandoned.is_empty(), "{abandoned:?}");
+    assert_eq!(
+        ctx.local_content
+            .read_editing_session(&open.id())
+            .expect("Read should succeed")
+            .and_then(|session| session.end),
+        None
+    );
 }
 
 #[tokio::test]
@@ -614,6 +620,31 @@ async fn test_a_push_after_the_editor_closes_sends_only_what_changed() {
 
     let update = ctx.server.requests().pop().expect("The update was sent");
     assert_eq!(update.body, Some(json!({ "title": "Offline edit" })));
+    let push_session = ctx
+        .local_content
+        .read_editing_sessions(session.working_copy_id())
+        .expect("Read should succeed")
+        .pop()
+        .expect("The push has a session");
+    assert_eq!(
+        push_session.source,
+        ActivitySource::App {
+            name: Some("push".to_string())
+        }
+    );
+    assert!(matches!(push_session.end, Some(SessionEnd::Normal { .. })));
+    let logged: Vec<_> = ctx
+        .local_content
+        .read_session_requests(push_session.id)
+        .expect("Read should succeed")
+        .into_iter()
+        .map(|record| (record.request.method, record.outcome.is_some()))
+        .collect();
+    assert_eq!(
+        logged,
+        [("GET".to_string(), true), ("POST".to_string(), true)],
+        "The fetch and the update are logged with their responses"
+    );
     assert_eq!(
         base_version(&ctx, &session).map(|remote| remote.base_modified_gmt),
         Some(date("2024-02-01T00:00:00"))
