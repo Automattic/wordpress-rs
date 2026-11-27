@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OAuth2ConfigurationStore.configuration_for(endpoints)`: like `find_configuration`, but fails with a localized `OAuth2ConfigurationStoreError` when the site's OAuth2 provider isn't registered, so apps can show a message instead of silently doing nothing.
 - **Internal:** `wp_rs_cli wpcom-login` signs in to WordPress.com in a browser with the OAuth2 authorization code flow and saves the account's bearer token to a file only you can read, without printing it. It reads the application's client ID and secret from a JSON file such as `wp_com_test_credentials.json`. It catches the sign-in itself when the application lists `http://localhost:8765/callback` as a redirect URL, and asks for the address the browser was sent to for any other redirect URL.
 
+### Fixed
+
+- A media upload file that exists but can't be read is now reported as `MediaFileUnreadable` on both platforms, and `MediaFileNotFound` is reserved for a path with nothing at it. Swift reported every field-construction failure (including permission and sandbox denials) as `MediaFileNotFound`, and Kotlin did the same for a directory or a file without read permission, while the other platform reported `MediaFileUnreadable` for the same input. The rustdoc for both variants now describes this split, which is by what's at the path rather than by when the read failed.
+
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.

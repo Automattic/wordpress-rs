@@ -203,6 +203,49 @@ class MultipartFormTests {
         #expect(filePath == "/tmp/uploads/photo.jpg")
     }
 
+    // Regression tests for #1500: every `MultipartFormField(fileAtPath:)` failure became
+    // `MediaFileNotFound`, so a file that exists but can't be read was reported as missing. Only a
+    // path with nothing at it is "not found" now; anything else there is "unreadable".
+    @Test(arguments: ["missing.jpg", "not-a-directory.txt/photo.jpg"])
+    func fieldConstructionFailureWithNothingAtThePathIsNotFound(relativePath: String) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // A regular file, so a path *through* it fails with ENOTDIR — also nothing at the path.
+        try Data().write(to: directory.appendingPathComponent("not-a-directory.txt"))
+        let path = directory.appendingPathComponent(relativePath).path
+
+        let error = try #require(throws: MultipartFormError.self) {
+            try MultipartFormField(fileAtPath: path, name: "file")
+        }
+
+        #expect(error.fieldConstructionError(filePath: path) == .MediaFileNotFound(filePath: path))
+    }
+
+    @Test
+    func fieldConstructionFailureForAnUnreadableFileIsUnreadable() {
+        // Permission and sandbox denials are driven by an injected error: `chmod 000` is bypassed when
+        // tests run as root, which is common in CI.
+        let error = MultipartFormError.inaccessibleFile(
+            underlyingError: CocoaError(.fileReadNoPermission),
+            filePath: "/tmp/uploads/photo.jpg"
+        )
+
+        #expect(
+            error.fieldConstructionError(filePath: "/tmp/uploads/photo.jpg")
+                == .MediaFileUnreadable(filePath: "/tmp/uploads/photo.jpg")
+        )
+    }
+
+    @Test
+    func fieldConstructionFailureAfterReadingAttributesIsUnreadable() {
+        // `.impossible` is thrown after the file's attributes were read, so something is there.
+        #expect(
+            MultipartFormError.impossible.fieldConstructionError(filePath: "/tmp/uploads/photo.jpg")
+                == .MediaFileUnreadable(filePath: "/tmp/uploads/photo.jpg")
+        )
+    }
+
     @Test
     func inaccessibleFileWithoutPathStaysGeneric() throws {
         // A serialization failure with no backing file (nil path) — or `.impossible` — has
