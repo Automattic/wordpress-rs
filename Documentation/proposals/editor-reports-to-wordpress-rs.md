@@ -9,9 +9,9 @@ The editor reports what it does to the app. It reports every change to the post,
 1. a change becomes a new version in the history of the post's working copy;
 2. a request goes into the editing session's request log, and is completed when its response or failure is reported.
 
-Information flows one way, from the editor to wordpress-rs. The one exception is opening the editor, which starts from the working copy wordpress-rs has. The editor never waits for a report to be recorded.
+Information flows one way, from the editor to wordpress-rs. The one exception is opening the editor, which starts from the working copy wordpress-rs has. The editor never waits for a report to be recorded. While it's open, the editor has the current version of the post, and the working copy follows a moment behind, as reports arrive.
 
-While the editor is open, only the editor sends the post to the server. Once it closes, only wordpress-rs does. An app that doesn't ask GutenbergKit for reports gets GutenbergKit's built-in behavior, unchanged.
+While the editor is open, only the editor sends the post to the server. wordpress-rs sends a working copy, a push, only when the app asks it to, and the app doesn't while the editor is open. An app that doesn't ask GutenbergKit for reports gets GutenbergKit's built-in behavior, unchanged.
 
 ## Goals
 
@@ -28,17 +28,15 @@ Secondary goals:
 
 ## Terms
 
-- **Working copy**: the user's version of a post or page, stored on the device by wordpress-rs. Only the user changes it, and only an explicit user action deletes it.
-- **Version**: the working copy's fields at one point in time. Every change adds a version, and the newest one holds the working copy's current fields. The versions together are its **history**.
-- **Parent**: the version a version was made from. Editing from an older version makes a new version whose parent is that older one.
-- **Cache**: wordpress-rs's copy of what it last learned the server has. It's a separate database from the working copies.
-- **Editing session**: one stretch of work on a working copy, recorded by wordpress-rs. A session in an editor runs from opening the editor to closing it. The app's own work, such as one save from a settings screen, is a one-off session that starts and ends with it. Each version is saved in exactly one session. A session can save any number of versions, or none, such as one that only reads or pushes.
-- **Request log**: the requests sent during a session, each with who sent it, and the response or failure that came back. It holds the editor's requests and wordpress-rs's own.
-- **Push**: wordpress-rs sending a working copy to the server, in a session of its own. It pushes only after the editor closes. While the editor is open, the editor saves the post itself.
+- **Working copy**: the user's version of a post or page, stored on the device by wordpress-rs.
+- **Version**: a working copy's fields at one point in time. A working copy's versions are its **history**.
+- **Parent**: the version a version was made from.
+- **Cache**: wordpress-rs's copy of what it last learned the server has.
+- **Editing session**: one stretch of work on a working copy, such as editing it in an editor, recorded by wordpress-rs.
+- **Request log**: the requests sent during a session, each with the response or failure that came back.
 - **Base version**: the server's `modified_gmt` for the version of the post a working copy's changes start from.
-- **Source of truth**: whichever has the current version of the post. While the editor is open, that's the editor, and the working copy follows a moment behind as reports arrive. Once the editor closes, it's the working copy.
-- **Editor protocol**: the interface between GutenbergKit and the app. It covers the reports, opening the editor with a post, and saving. GutenbergKit defines it.
-- **Session protocol**: the interface between the app and wordpress-rs. It covers the editing sessions that record the reports. wordpress-rs defines it.
+- **Editor protocol**: the interface between GutenbergKit and the app. GutenbergKit defines it.
+- **Session protocol**: the interface between the app and wordpress-rs. wordpress-rs defines it.
 
 ## The layers
 
@@ -184,8 +182,9 @@ impl PostEditorService {
     /// Start an editing session for a new post: a working copy with no remote post.
     pub fn open_new_post(&self, editor_name: Option<String>, identity: Option<String>) -> Result<PostEditorSession>;
 
-    /// Push a working copy after the editor closes, in a one-off session
-    /// named `push`, so its requests are logged.
+    /// Send a working copy to the server, when the app asks, in a one-off
+    /// session named `push`, so its requests are logged. Not for use while
+    /// the editor is open.
     pub async fn push_working_copy(&self, id: WorkingCopyId) -> Result<ServerResponse>;
 }
 
@@ -248,7 +247,7 @@ A session records one report at a time, in the order they arrive, so the history
 
 Local content storage ([wordpress-rs#1682](https://github.com/Automattic/wordpress-rs/pull/1682)) has the [working copy types](https://github.com/Automattic/wordpress-rs/blob/e6d2a8d85d06427d31a2b4f9e2468c4811c037be/wp_mobile_local_content/src/db_types/working_copy.rs#L132) and their database. The proposal changes how a working copy is stored, and adds editing sessions.
 
-**A working copy is an ID with a history.** Saving a working copy adds a version made from the newest one, recorded in the session the save was made in. A save outside any session, and creating a working copy, each get a one-off session. Saving the fields it already has adds nothing, not even a session.
+**A working copy is an ID with a history.** Its newest version holds its current fields. Saving a working copy adds a version made from the newest one, recorded in the session the save was made in. A save outside any session, and creating a working copy, each get a one-off session. Saving the fields it already has adds nothing, not even a session.
 
 To keep the history small, the content is stored apart from the other fields. A version refers to one content row and one row of the other fields. When only the title changes, the new version reuses its parent's content row. When only the content changes, it reuses its parent's other fields.
 
@@ -271,7 +270,7 @@ pub fn read_post_working_copy_version(&self, id: WorkingCopyVersionId) -> Result
 
 **Fields a working copy doesn't model.** Plugins can add their own fields to a post, as post meta or as top-level fields of their own. The working copy stores both as JSON, as the cache does, and pushes them as they are. wordpress-rs can say which key changed, but not what its value means.
 
-**Editing sessions.** One record per session, stored with the working copies, so clearing the cache never removes it. A session holds only facts: what it was, who opened it, and what happened to it. Whether it's open is worked out from those facts.
+**Editing sessions.** One record per session, stored with the working copies, so clearing the cache never removes it. A session in an editor runs from opening the editor to closing it. The app's own work, such as one push, is a one-off session that starts and ends with it. Each version is saved in exactly one session. A session can save any number of versions, or none, such as one that only reads or pushes. A session holds only facts: what it was, who opened it, and what happened to it. Whether it's open is worked out from those facts.
 
 ```rust
 pub struct EditingSession {
@@ -348,11 +347,13 @@ Everything an abandoned session recorded is still there: its versions up to `las
 
 `[decision]` What the app does with the abandoned sessions: offer to reopen the editor, record it in analytics, try to push, or nothing. wordpress-rs provides the facts, and each app decides.
 
-### Pushing after the editor closes
+### Pushing
 
-`[not designed]` When and how wordpress-rs pushes a working copy after the editor closes, including after an abandoned session. Each push is a one-off session of its own, so its requests are logged like the editor's.
+wordpress-rs pushes a working copy only when the app asks, with `push_working_copy`. Each push is a one-off session of its own, so its requests are logged like the editor's.
 
-Plugins' save hooks don't run for these pushes, because the editor isn't involved.
+`[not designed]` When an app asks for a push.
+
+Plugins' save hooks don't run for pushes, because the editor isn't involved.
 
 ### Autosaves, previews and revisions
 
@@ -362,7 +363,7 @@ The editor makes these requests itself. They're below the post's path, so they'r
 
 The proof of concept is on the `editor-reports` branches of wordpress-rs and GutenbergKit.
 
-- wordpress-rs builds layers C and D for posts: the session protocol, editing sessions and how they end, the history, and the request log. Thinning isn't built. Pushing after the editor closes is a placeholder. It fetches the post first, sends only the fields that changed, and sends nothing when the server and the working copy both changed.
+- wordpress-rs builds layers C and D for posts: the session protocol, editing sessions and how they end, the history, and the request log. Thinning isn't built. Pushing is a placeholder. It fetches the post first, sends only the fields that changed, and sends nothing when the server and the working copy both changed.
 - GutenbergKit has temporary stand-ins for the editor protocol, in JavaScript and in the iOS library, for the example app to use until GutenbergKit builds the real one. The iOS example app opens posts in an editing session.
 
 It leaves out:
@@ -385,7 +386,7 @@ In unit tests, against a scripted server:
 - Credential headers aren't stored.
 - Recording abandoned sessions ends only the client's sessions from an earlier run, and returns them.
 - Deleting a session deletes its versions and its requests.
-- A push after the editor closes logs its fetch and its update, with their responses, in its own session.
+- A push logs its fetch and its update, with their responses, in its own session.
 
 Not tried yet:
 
