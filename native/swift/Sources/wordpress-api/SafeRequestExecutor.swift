@@ -291,11 +291,11 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         // classification at the executor layer: `RequestExecutionError` can't
         // produce `WpApiError.SiteUrlParsingError` (that's a parse-time error, one
         // layer up) and `RequestExecutionErrorReason` has no invalid-URL case, so
-        // `NonExistentSiteError` is the nearest fit. In practice we could not
-        // construct a URL that reaches this branch: request URLs are normalized by
-        // the Rust `url` crate before they arrive, and modern Foundation repairs
-        // the leftovers (e.g. an invalid `%zz` becomes `%25zz`) rather than raising
-        // `.badURL`. It's kept for completeness.
+        // `NonExistentSiteError` is the nearest fit. `buildURLRequest` throws
+        // `.badURL` for an address that isn't a URL, which none of the requests
+        // Swift can make produce. On macOS 27, `URLSession` also returns it for
+        // a `0.0.0.0` host (Network.framework rejects it with `EINVAL`), such as
+        // a local development site bound to `0.0.0.0`. See #1746.
         [
             .badURL,
             .cannotFindHost,
@@ -606,7 +606,11 @@ protocol NetworkRequestContent {
 
 extension NetworkRequestContent {
     func buildURLRequest(additionalHeaders: [String: String]) throws -> URLRequest {
-        let url = URL(string: self.url())!
+        // Rust's `url` crate leaves characters RFC 3986 doesn't allow, such as `{` in a host or `|` in a path,
+        // unencoded. Only those addresses are re-encoded, so every other address is sent as it is. See #1746.
+        guard let url = strictURL(self.url()) ?? wpEndpointUrlRfc3986(url: self.url()).flatMap(strictURL) else {
+            throw URLError(.badURL, userInfo: [NSURLErrorFailingURLStringErrorKey: self.url()])
+        }
         var request = URLRequest(url: url)
         request.httpMethod = self.method().rawValue
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
@@ -617,6 +621,17 @@ extension NetworkRequestContent {
         try self.encodeBody(into: &request)
         return request
     }
+}
+
+/// Parses `string` as a `URL`, or returns `nil` if it isn't valid RFC 3986.
+///
+/// Don't use `URL(string:)` for this. From iOS 17 and macOS 14 it encodes invalid characters instead of failing,
+/// and also re-encodes the escapes beside them: `/a%20b|c` becomes `/a%2520b%7Cc`, which is a different path.
+private func strictURL(_ string: String) -> URL? {
+    if #available(macOS 14, iOS 17, tvOS 17, watchOS 10, *) {
+        return URL(string: string, encodingInvalidCharacters: false)
+    }
+    return URL(string: string)
 }
 
 extension WpNetworkRequest: NetworkRequestContent {
