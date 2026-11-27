@@ -2627,17 +2627,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "parse_link_header"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eb9c7a76731a2792f9b97fb34c1e774fff008badcd449d61fcdacb7a912392b"
-dependencies = [
- "http 1.5.0",
- "lazy_static",
- "regex",
-]
-
-[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5451,7 +5440,6 @@ dependencies = [
  "itertools",
  "log",
  "oslog",
- "parse_link_header",
  "paste",
  "regex",
  "reqwest",

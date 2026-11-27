@@ -4,6 +4,7 @@ use crate::{
     auth::{WpAuthentication, WpAuthenticationProvider},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
+use crate::{html_links::resolve_web_address, link_header};
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use endpoint::{
@@ -607,23 +608,56 @@ impl WpSupportsLocalization for WpNetworkHeaderMapError {
 }
 
 impl WpNetworkResponse {
+    /// Returns the targets of the `Link` header entries with the relation type `name`, in
+    /// order.
+    ///
+    /// A target may be relative, such as `</wp-json/>; rel="https://api.w.org/"`. As RFC 8288
+    /// says, it's resolved against the URL of the request this response answers. Executors
+    /// report the URL that was requested, not where a redirect ended up, so after a redirect a
+    /// relative target may resolve against the wrong address.
+    ///
+    /// Left out: targets that aren't `http` or `https` once resolved, entries that aren't well
+    /// formed (without affecting the others), and entries with an `anchor`, which describe
+    /// another resource.
     pub fn get_link_header(&self, name: &str) -> Vec<Url> {
-        [
-            self.response_header_map.inner.get_all(http::header::LINK),
-            self.response_header_map
-                .inner
-                .get_all(http::header::LINK.to_string().to_lowercase()),
-        ]
-        .into_iter()
-        .flatten()
-        .flat_map(|link_header| link_header.to_str().ok())
-        .flat_map(|link_header_str| parse_link_header::parse_with_rel(link_header_str).ok())
-        .flat_map(|link_map| {
-            link_map
-                .get(name)
-                .and_then(|link| Url::parse(link.raw_uri.as_str()).ok())
-        })
-        .collect()
+        self.link_header_targets(name, Url::parse(&self.request_url.0).ok().as_ref())
+    }
+
+    /// Returns what [`Self::get_link_header`] does, with relative targets resolved against
+    /// `base_url` instead.
+    pub(crate) fn get_link_header_relative_to(&self, name: &str, base_url: &Url) -> Vec<Url> {
+        self.link_header_targets(name, Some(base_url))
+    }
+
+    fn link_header_targets(&self, name: &str, base_url: Option<&Url>) -> Vec<Url> {
+        // Header names are case-insensitive, so this finds `Link`, `link` and `LINK`.
+        //
+        // `WpNetworkHeaderMap` splits header values at every comma, including the commas inside
+        // a target like `<…?ids=1,2>`, trims the pieces, and drops empty ones. Several values of
+        // one header mean the same as one value joined with commas (RFC 9110), so join them
+        // back before parsing. That restores any URL without an empty piece: `?ids=1,,2` comes
+        // back as `?ids=1,2`. A piece that isn't valid UTF-8 is kept, lossily, so its
+        // neighbours aren't joined into a link the server never sent.
+        let header = self
+            .response_header_map
+            .inner
+            .get_all(http::header::LINK)
+            .into_iter()
+            .map(|value| String::from_utf8_lossy(value.as_bytes()))
+            .collect::<Vec<_>>()
+            .join(",");
+        link_header::parse(&header)
+            .into_iter()
+            .filter(|link| link.has_rel(name))
+            // An empty anchor names the response itself.
+            .filter(|link| link.anchor.as_deref().is_none_or(str::is_empty))
+            .filter_map(|link| match base_url {
+                Some(base_url) => resolve_web_address(&link.target, base_url),
+                None => Url::parse(&link.target)
+                    .ok()
+                    .filter(|url| matches!(url.scheme(), "http" | "https")),
+            })
+            .collect()
     }
 
     pub fn get_pagination_header<P: FromUrlQueryPairs>(
@@ -1295,6 +1329,192 @@ mod tests {
             "response headers: {:?}",
             response.response_header_map.inner
         );
+    }
+
+    fn response_with_link_header(request_url: &str, link: &str) -> WpNetworkResponse {
+        WpNetworkResponse {
+            body: Vec::with_capacity(0),
+            status_code: 200,
+            response_header_map: Arc::new(
+                WpNetworkHeaderMap::from_map([("Link".to_string(), link.to_string())].into())
+                    .unwrap(),
+            ),
+            request_url: WpEndpointUrl(request_url.to_string()),
+            request_method: RequestMethod::GET,
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+        }
+    }
+
+    #[rstest]
+    #[case::absolute(
+        "https://example.com/",
+        "https://example.com/wp-json/",
+        "https://example.com/wp-json/"
+    )]
+    #[case::root_relative(
+        "https://example.com/",
+        "/wp/wp-json/",
+        "https://example.com/wp/wp-json/"
+    )]
+    #[case::protocol_relative(
+        "https://example.com/",
+        "//example.com/wp-json/",
+        "https://example.com/wp-json/"
+    )]
+    #[case::path_relative(
+        "https://example.com/blog/",
+        "wp-json/",
+        "https://example.com/blog/wp-json/"
+    )]
+    #[case::query_only(
+        "https://example.com/",
+        "?rest_route=/",
+        "https://example.com/?rest_route=/"
+    )]
+    #[case::relative_to_request_path(
+        "https://example.com/wp-json/wp/v2/posts?page=1",
+        "posts?page=2",
+        "https://example.com/wp-json/wp/v2/posts?page=2"
+    )]
+    fn test_link_header_resolves_against_request_url(
+        #[case] request_url: &str,
+        #[case] target: &str,
+        #[case] expected: &str,
+    ) {
+        let response =
+            response_with_link_header(request_url, &format!(r#"<{target}>; rel="next""#));
+        assert_eq!(
+            response.get_link_header("next"),
+            [Url::parse(expected).unwrap()]
+        );
+    }
+
+    #[test]
+    fn test_link_header_reads_the_rest_of_a_header_with_a_bad_entry() {
+        // A malformed entry, and a comma inside a target, don't affect the other entries.
+        let response = response_with_link_header(
+            "https://example.com/",
+            r#"junk, <https://example.com/?ids=1,2&page=2>; rel="next", </wp-json/>; rel="https://api.w.org/""#,
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            [Url::parse("https://example.com/?ids=1,2&page=2").unwrap()]
+        );
+        assert_eq!(
+            response.get_link_header("https://api.w.org/"),
+            [Url::parse("https://example.com/wp-json/").unwrap()]
+        );
+    }
+
+    fn urls(urls: &[&str]) -> Vec<Url> {
+        urls.iter().map(|url| Url::parse(url).unwrap()).collect()
+    }
+
+    // OkHttp's `toMultimap()` (Kotlin) gives one value per `Link` line.
+    #[test]
+    fn test_link_header_reads_every_line_in_order() {
+        let response = WpNetworkResponse {
+            response_header_map: Arc::new(
+                WpNetworkHeaderMap::from_multi_map(
+                    [(
+                        "link".to_string(),
+                        vec![
+                            r#"</a>; rel="next""#.to_string(),
+                            r#"<https://example.com/?ids=1,2>; rel="next", </c>; rel="prev""#
+                                .to_string(),
+                        ],
+                    )]
+                    .into(),
+                )
+                .unwrap(),
+            ),
+            ..response_with_link_header("https://example.com/", "")
+        };
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/a", "https://example.com/?ids=1,2"])
+        );
+        assert_eq!(
+            response.get_link_header("prev"),
+            urls(&["https://example.com/c"])
+        );
+    }
+
+    #[test]
+    fn test_link_header_keeps_a_piece_that_isnt_ascii() {
+        // `WpNetworkHeaderMap` splits this at both commas. The middle piece isn't ASCII; if it
+        // were dropped, the pieces either side would join into `<https://example.com/?a=1,</p>`.
+        let response = response_with_link_header(
+            "https://example.com/",
+            r#"<https://example.com/?a=1,é>; rel="next", </p>; rel="prev""#,
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/?a=1,%C3%A9"])
+        );
+        assert_eq!(
+            response.get_link_header("prev"),
+            urls(&["https://example.com/p"])
+        );
+    }
+
+    // `WpNetworkHeaderMap` splits these at the commas inside the quoted values and the query,
+    // so this checks they survive the round trip.
+    #[test]
+    fn test_link_header_keeps_commas_in_quoted_params_and_queries() {
+        let response = response_with_link_header(
+            "https://sentry.io/api/0/projects/1/groups/",
+            r#"<?&cursor=1420837590:0:1>; rel="previous"; results="false", <https://example.com/?ids=1,2>; rel="next"; csv="one,two", </last>; rel="last""#,
+        );
+        assert_eq!(
+            response.get_link_header("previous"),
+            urls(&["https://sentry.io/api/0/projects/1/groups/?&cursor=1420837590:0:1"])
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/?ids=1,2"])
+        );
+        assert_eq!(
+            response.get_link_header("last"),
+            urls(&["https://sentry.io/last"])
+        );
+    }
+
+    #[test]
+    fn test_link_header_without_a_usable_request_url() {
+        // There's nothing to resolve a relative target against, and only `http(s)` targets
+        // are kept.
+        let response = response_with_link_header(
+            "not a url",
+            r#"<https://example.com/a>; rel="next", </b>; rel="next", <mailto:a@example.com>; rel="next", <ftp://example.com/c>; rel="next""#,
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/a"])
+        );
+    }
+
+    #[test]
+    fn test_link_header_leaves_out_links_about_another_resource() {
+        let response = response_with_link_header(
+            "https://example.com/",
+            r##"</a>; rel="next"; anchor="#comments", </b>; rel="next"; anchor="/other", </c>; rel="next"; anchor="", </d>; rel="next""##,
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/c", "https://example.com/d"])
+        );
+    }
+
+    #[rstest]
+    #[case::mailto("mailto:someone@example.com")]
+    #[case::ftp("ftp://example.com/wp-json/")]
+    fn test_link_header_ignores_targets_that_arent_http(#[case] target: &str) {
+        let response = response_with_link_header(
+            "https://example.com/",
+            &format!(r#"<{target}>; rel="next""#),
+        );
+        assert_eq!(response.get_link_header("next"), Vec::<Url>::new());
     }
 
     fn pagination_test_response(

@@ -374,16 +374,19 @@ impl WpLoginClient {
             .fetch_homepage(Arc::clone(&parsed_site_url), context)
             .await
             .map_err(|error| FindApiRootFailure::FetchHomepage { error })?;
+        // The `Link` header and the `<link>` tag resolve against the same base, so a relative
+        // `wp-json/` means the same address in both.
+        let homepage_url = site_directory_url(&parsed_site_url.inner);
         // First check if we can find and parse the api root from the link header
-        if let Some(api_root_url) = self.parse_response_link_header_to_find_api_root(&response) {
+        if let Some(api_root_url) =
+            self.parse_response_link_header_to_find_api_root(&response, &homepage_url)
+        {
             return Ok(ApiRootUrl(api_root_url.into()));
         }
         // If we can't find the api root in the link header, we parse the HTML page to look for it
         // in the link tags
-        let parse_html_result = ParseHomepageResult::parse_response(
-            &response.body_as_string(),
-            &site_directory_url(&parsed_site_url.inner),
-        );
+        let parse_html_result =
+            ParseHomepageResult::parse_response(&response.body_as_string(), &homepage_url);
         if let Some(api_root_url) = parse_html_result.api_root_url_from_link_tag {
             return Ok(ApiRootUrl(api_root_url));
         }
@@ -398,9 +401,10 @@ impl WpLoginClient {
     fn parse_response_link_header_to_find_api_root(
         &self,
         response: &WpNetworkResponse,
+        homepage_url: &Url,
     ) -> Option<ParsedUrl> {
         response
-            .get_link_header(API_ROOT_LINK_HEADER)
+            .get_link_header_relative_to(API_ROOT_LINK_HEADER, homepage_url)
             .into_iter()
             .nth(0)
             .map(ParsedUrl::new)
@@ -949,8 +953,11 @@ mod tests {
 
     /// Answers each request with the body routed to its URL, or a 404 for any other URL, and
     /// records the URLs it receives.
+    #[derive(Default)]
     struct RoutingExecutor {
         routes: Vec<(&'static str, String)>,
+        /// The `Link` header each URL answers with.
+        link_headers: Vec<(&'static str, &'static str)>,
         requested_urls: Mutex<Vec<String>>,
     }
 
@@ -969,8 +976,17 @@ mod tests {
                 .iter()
                 .find(|(url, _)| *url == request.url.0)
                 .map_or(("", 404), |(_, body)| (body.as_str(), 200));
+            let mut header_map = http::HeaderMap::new();
+            if let Some((_, link)) = self
+                .link_headers
+                .iter()
+                .find(|(url, _)| *url == request.url.0)
+            {
+                header_map.insert(http::header::LINK, http::HeaderValue::from_static(link));
+            }
             Ok(WpNetworkResponse {
                 request_url: request.url.clone(),
+                response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
                 ..wp_network_response_from_json(body, status_code)
             })
         }
@@ -1023,7 +1039,7 @@ mod tests {
     ) -> (Result<ParsedUrl, XmlrpcDiscoveryError>, Vec<String>) {
         let executor = Arc::new(RoutingExecutor {
             routes: vec![(site_url, homepage), (RSD_URL, rsd_body(api_link))],
-            requested_urls: Mutex::new(vec![]),
+            ..Default::default()
         });
         let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
         let result = client
@@ -1157,10 +1173,24 @@ mod tests {
         Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
         Vec<String>,
     ) {
-        let executor = Arc::new(RoutingExecutor {
-            routes,
-            requested_urls: Mutex::new(vec![]),
-        });
+        discover_using(
+            site_url,
+            RoutingExecutor {
+                routes,
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    async fn discover_using(
+        site_url: &str,
+        executor: RoutingExecutor,
+    ) -> (
+        Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
+        Vec<String>,
+    ) {
+        let executor = Arc::new(executor);
         let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
         let result = client
             .attempt_api_discovery(
@@ -1201,6 +1231,48 @@ mod tests {
         assert_eq!(
             requested_urls,
             [site_url, "https://example.com/blog/wp-json/"]
+        );
+        assert_eq!(
+            result.unwrap().api_root_url.url(),
+            "https://example.com/blog/wp-json/"
+        );
+    }
+
+    // A `Link` header resolves against the same base as the `<link>` tag. `example.com/wp-json/`
+    // is a REST API root too, of a different site, so resolving against `example.com/blog`
+    // would succeed against the wrong site.
+    #[rstest]
+    #[case::path_relative("<wp-json/>; rel=\"https://api.w.org/\"")]
+    #[case::dot_relative("<./wp-json/>; rel=\"https://api.w.org/\"")]
+    #[tokio::test]
+    async fn test_api_discovery_resolves_link_header_against_site_directory(
+        #[case] link_header: &'static str,
+    ) {
+        let (result, requested_urls) = discover_using(
+            "https://example.com/blog",
+            RoutingExecutor {
+                routes: vec![
+                    ("https://example.com/blog", String::new()),
+                    (
+                        "https://example.com/blog/wp-json/",
+                        api_root_body("https://example.com/blog"),
+                    ),
+                    (
+                        "https://example.com/wp-json/",
+                        api_root_body("https://example.com"),
+                    ),
+                ],
+                link_headers: vec![("https://example.com/blog", link_header)],
+                ..Default::default()
+            },
+        )
+        .await;
+        assert_eq!(
+            requested_urls,
+            [
+                "https://example.com/blog",
+                "https://example.com/blog/wp-json/"
+            ]
         );
         assert_eq!(
             result.unwrap().api_root_url.url(),
